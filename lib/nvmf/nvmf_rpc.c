@@ -1392,9 +1392,9 @@ struct nvmf_rpc_ns_attachment_ctx {
 
 static const struct spdk_json_object_decoder nvmf_rpc_ns_attachment_decoder[] = {
 	{"nqn", offsetof(struct nvmf_rpc_ns_attachment_ctx, nqn), spdk_json_decode_string},
-	{"nsid", offsetof(struct spdk_nvmf_ns_params, nsid), spdk_json_decode_uint32},
+	{"nsid", offsetof(struct nvmf_rpc_ns_attachment_ctx, nsid), spdk_json_decode_uint32},
 	{"host", offsetof(struct nvmf_rpc_ns_attachment_ctx, host), spdk_json_decode_string, true},
-	{"tgt_name", offsetof(struct nvmf_rpc_host_ctx, tgt_name), spdk_json_decode_string, true},
+	{"tgt_name", offsetof(struct nvmf_rpc_ns_attachment_ctx, tgt_name), spdk_json_decode_string, true},
 };
 
 static void
@@ -1421,8 +1421,8 @@ rpc_nvmf_ns_attach(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	if (spdk_json_decode_object(params, nvmf_rpc_subsystem_ns_decoder,
-				    SPDK_COUNTOF(nvmf_rpc_subsystem_ns_decoder),
+	if (spdk_json_decode_object(params, nvmf_rpc_ns_attachment_decoder,
+				    SPDK_COUNTOF(nvmf_rpc_ns_attachment_decoder),
 				    ctx)) {
 		SPDK_ERRLOG("spdk_json_decode_object failed\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
@@ -1443,7 +1443,7 @@ rpc_nvmf_ns_attach(struct spdk_jsonrpc_request *request,
 
 	subsystem = spdk_nvmf_tgt_find_subsystem(tgt, ctx->nqn);
 	if (!subsystem) {
-		SPDK_ERRLOG("Unable to find subsystem with NQN %s\n", ctx.nqn);
+		SPDK_ERRLOG("Unable to find subsystem with NQN %s\n", ctx->nqn);
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
 		nvmf_rpc_ns_attachment_ctx_free(ctx);
 		return;
@@ -1477,8 +1477,8 @@ rpc_nvmf_ns_detach(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	if (spdk_json_decode_object(params, nvmf_rpc_subsystem_ns_decoder,
-				    SPDK_COUNTOF(nvmf_rpc_subsystem_ns_decoder),
+	if (spdk_json_decode_object(params, nvmf_rpc_ns_attachment_decoder,
+				    SPDK_COUNTOF(nvmf_rpc_ns_attachment_decoder),
 				    ctx)) {
 		SPDK_ERRLOG("spdk_json_decode_object failed\n");
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
@@ -1499,7 +1499,7 @@ rpc_nvmf_ns_detach(struct spdk_jsonrpc_request *request,
 
 	subsystem = spdk_nvmf_tgt_find_subsystem(tgt, ctx->nqn);
 	if (!subsystem) {
-		SPDK_ERRLOG("Unable to find subsystem with NQN %s\n", ctx.nqn);
+		SPDK_ERRLOG("Unable to find subsystem with NQN %s\n", ctx->nqn);
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
 		nvmf_rpc_ns_attachment_ctx_free(ctx);
 		return;
