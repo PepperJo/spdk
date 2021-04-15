@@ -184,6 +184,11 @@ struct spdk_nvmf_ns {
 	char *ptpl_file;
 	/* Persist Through Power Loss feature is enabled */
 	bool ptpl_activated;
+
+	/* Attach namespace to controllers of these hosts */
+	TAILQ_HEAD(, spdk_nvmf_host) hosts;
+	/* Attach namespace to any controller */
+	bool attach_any_ctrlr;
 };
 
 struct spdk_nvmf_ctrlr_feat {

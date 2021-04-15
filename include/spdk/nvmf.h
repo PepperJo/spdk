@@ -509,6 +509,13 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_first(struct spdk_nvmf_tgt *
  */
 struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem);
 
+
+int
+spdk_nvmf_ns_attach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+
+int
+spdk_nvmf_ns_detach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+
 /**
  * Allow the given host NQN to connect to the given subsystem.
  *

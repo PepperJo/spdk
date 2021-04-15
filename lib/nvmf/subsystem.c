@@ -702,6 +702,19 @@ spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem)
 	return NULL;
 }
 
+int
+spdk_nvmf_ns_attach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
+{
+	
+	return 0;
+}
+
+int
+spdk_nvmf_ns_detach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
+{
+	return 0;
+}
+
 /* Must hold subsystem->mutex while calling this function */
 static struct spdk_nvmf_host *
 nvmf_subsystem_find_host(struct spdk_nvmf_subsystem *subsystem, const char *hostnqn)
