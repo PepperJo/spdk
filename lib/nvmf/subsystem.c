@@ -702,16 +702,124 @@ spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem)
 	return NULL;
 }
 
+struct spdk_nvmf_host * 
+nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host = NULL;
+
+	TAILQ_FOREACH(host, &ns->hosts, link) {
+		if (strcmp(hostnqn, host->nqn) == 0) {
+			return host;
+		}
+	}
+
+	return NULL;
+}
+
 int
 spdk_nvmf_ns_attach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
 {
-	
+	struct spdk_nvmf_host *host;
+	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
+
+	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
+		return -EINVAL;
+	}
+
+	pthread_mutex_lock(&subsystem->mutex);
+
+	if (nsid == 0 || nsid > subsystem->max_nsid) {
+		return -EINVAL;
+	}
+
+	ns = subsystem->ns[nsid - 1];
+	if (!ns) {
+		return -ENOENT;
+	}
+
+	if (hostnqn == NULL) {
+		/* Attach any ctrlr to this namespace */
+		ns->attach_any_ctrlr = true;
+		pthread_mutex_unlock(&subsystem->mutex);
+		return 0;
+	}
+
+	if (nvmf_ns_find_host(ns, hostnqn)) {
+		/* This ns already attaches the specified host. */
+		pthread_mutex_unlock(&subsystem->mutex);
+		return 0;
+	}
+
+	host = calloc(1, sizeof(*host));
+	if (!host) {
+		pthread_mutex_unlock(&subsystem->mutex);
+		return -ENOMEM;
+	}
+
+	snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
+
+	TAILQ_INSERT_HEAD(&ns->hosts, host, link);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		ctrlr->active_ns[nsid - 1] = true; 
+	}
+
+	// TODO: check
+	nvmf_update_discovery_log(subsystem->tgt, hostnqn);
+
+	pthread_mutex_unlock(&subsystem->mutex);
+
 	return 0;
 }
 
 int
 spdk_nvmf_ns_detach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
 {
+	struct spdk_nvmf_host *host;
+	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
+
+	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
+		return -EINVAL;
+	}
+
+	pthread_mutex_lock(&subsystem->mutex);
+
+	if (nsid == 0 || nsid > subsystem->max_nsid) {
+		return -EINVAL;
+	}
+
+	ns = subsystem->ns[nsid - 1];
+	if (!ns) {
+		return -ENOENT;
+	}
+
+	if (hostnqn == NULL) {
+		/* Do not attach any ctrlr to this namespace per default */
+		ns->attach_any_ctrlr = false;
+		pthread_mutex_unlock(&subsystem->mutex);
+		return 0;
+	}
+
+	host = nvmf_ns_find_host(ns, hostnqn);
+	if (host == NULL) {
+		pthread_mutex_unlock(&subsystem->mutex);
+		return -ENOENT;
+	}
+
+	TAILQ_REMOVE(&ns->hosts, host, link);
+	free(host);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		ctrlr->active_ns[nsid - 1] = false; 
+	}
+
+	//TODO: check
+	nvmf_update_discovery_log(subsystem->tgt, hostnqn);
+
+	pthread_mutex_unlock(&subsystem->mutex);
+
 	return 0;
 }
 
