@@ -703,7 +703,7 @@ spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem)
 }
 
 struct spdk_nvmf_host * 
-nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
 {
 	struct spdk_nvmf_host *host = NULL;
 
@@ -745,7 +745,7 @@ spdk_nvmf_ns_attach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const 
 		return 0;
 	}
 
-	if (nvmf_ns_find_host(ns, hostnqn)) {
+	if (spdk_nvmf_ns_find_host(ns, hostnqn)) {
 		/* This ns already attaches the specified host. */
 		pthread_mutex_unlock(&subsystem->mutex);
 		return 0;
@@ -802,7 +802,7 @@ spdk_nvmf_ns_detach(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const 
 		return 0;
 	}
 
-	host = nvmf_ns_find_host(ns, hostnqn);
+	host = spdk_nvmf_ns_find_host(ns, hostnqn);
 	if (host == NULL) {
 		pthread_mutex_unlock(&subsystem->mutex);
 		return -ENOENT;
