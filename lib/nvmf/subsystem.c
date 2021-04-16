@@ -741,6 +741,10 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	if (hostnqn == NULL) {
 		/* Attach any ctrlr to this namespace */
 		ns->attach_any_ctrlr = true;
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			ctrlr->active_ns[nsid - 1] = true;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
 		pthread_mutex_unlock(&subsystem->mutex);
 		return 0;
 	}
@@ -762,8 +766,10 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	TAILQ_INSERT_HEAD(&ns->hosts, host, link);
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		ctrlr->active_ns[nsid - 1] = true;
-		nvmf_ctrlr_async_event_ns_notice(ctrlr); 
+		if (strcmp(hostnqn, ctrlr->hostnqn) == 0) {
+			ctrlr->active_ns[nsid - 1] = true;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
 	}
 
 	pthread_mutex_unlock(&subsystem->mutex);
@@ -796,12 +802,16 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	if (hostnqn == NULL) {
 		/* Do not attach any ctrlr to this namespace per default */
 		ns->attach_any_ctrlr = false;
-		pthread_mutex_unlock(&subsystem->mutex);
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			ctrlr->active_ns[nsid - 1] = false;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
 		return 0;
 	}
 
 	host = spdk_nvmf_ns_find_host(ns, hostnqn);
 	if (host == NULL) {
+		/* This ns already does not attach the specified host */
 		pthread_mutex_unlock(&subsystem->mutex);
 		return -ENOENT;
 	}
@@ -810,8 +820,10 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	free(host);
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		ctrlr->active_ns[nsid - 1] = false;
-		nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		if (strcmp(hostnqn, ctrlr->hostnqn) == 0) {
+			ctrlr->active_ns[nsid - 1] = false;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
 	}
 
 	pthread_mutex_unlock(&subsystem->mutex);
