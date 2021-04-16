@@ -1460,7 +1460,7 @@ rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
 	spdk_jsonrpc_send_bool_response(request, true);
 	nvmf_rpc_ns_attachment_ctx_free(ctx);
 }
-SPDK_RPC_REGISTER("rpc_nvmf_ns_attach_ctrlr", rpc_nvmf_ns_attach_ctrlr, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("nvmf_ns_attach_ctrlr", rpc_nvmf_ns_attach_ctrlr, SPDK_RPC_RUNTIME)
 
 static void
 rpc_nvmf_ns_detach_ctrlr(struct spdk_jsonrpc_request *request,
@@ -1516,7 +1516,7 @@ rpc_nvmf_ns_detach_ctrlr(struct spdk_jsonrpc_request *request,
 	spdk_jsonrpc_send_bool_response(request, true);
 	nvmf_rpc_ns_attachment_ctx_free(ctx);
 }
-SPDK_RPC_REGISTER("rpc_nvmf_ns_detach_ctrlr", rpc_nvmf_ns_detach_ctrlr, SPDK_RPC_RUNTIME)
+SPDK_RPC_REGISTER("nvmf_ns_detach_ctrlr", rpc_nvmf_ns_detach_ctrlr, SPDK_RPC_RUNTIME)
 
 struct nvmf_rpc_host_ctx {
 	struct spdk_jsonrpc_request *request;
