@@ -443,6 +443,52 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
 
     return client.call('nvmf_subsystem_remove_ns', params)
 
+def nvmf_ns_attach(client, nqn, nsid, host=None, tgt_name=None):
+    """Attach controller of host to namespace
+
+    Args:
+        nqn: Subsystem NQN.
+        nsid: Namespace ID.
+        host: Host NQN to attach (optional).
+        tgt_name: name of the parent NVMe-oF target (optional).
+
+    Returns:
+        True or False
+    """
+    params = {'nqn': nqn,
+              'nsid': nsid}
+
+    if host:
+        params['host'] = host
+
+    if tgt_name:
+        params['tgt_name'] = tgt_name
+
+    return client.call('nvmf_ns_attach', params)
+
+def nvmf_ns_detach(client, nqn, nsid, host=None, tgt_name=None):
+    """Detach controller of host from namespace
+
+    Args:
+        nqn: Subsystem NQN.
+        nsid: Namespace ID.
+        host: Host NQN to detach (optional).
+        tgt_name: name of the parent NVMe-oF target (optional).
+
+    Returns:
+        True or False
+    """
+    params = {'nqn': nqn,
+              'nsid': nsid}
+
+    if host:
+        params['host'] = host
+
+    if tgt_name:
+        params['tgt_name'] = tgt_name
+
+    return client.call('nvmf_ns_detach', params)
+
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
     """Add a host NQN to the list of allowed hosts.
