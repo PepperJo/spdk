@@ -1449,7 +1449,7 @@ rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	rc = spdk_nvmf_ns_attach(subsystem, ctx->nsid, ctx->host);
+	rc = spdk_nvmf_ns_attach_ctrlr(subsystem, ctx->nsid, ctx->host);
 	if (rc != 0) {
 		SPDK_ERRLOG("Unable to attach %s to namespace ID %u\n", ctx->host, ctx->nsid);
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
@@ -1505,7 +1505,7 @@ rpc_nvmf_ns_detach_ctrlr(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	rc = spdk_nvmf_ns_detach(subsystem, ctx->nsid, ctx->host);
+	rc = spdk_nvmf_ns_detach_ctrlr(subsystem, ctx->nsid, ctx->host);
 	if (rc != 0) {
 		SPDK_ERRLOG("Unable to detach %s to namespace ID %u\n", ctx->host, ctx->nsid);
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
