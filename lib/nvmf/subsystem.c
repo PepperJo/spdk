@@ -762,10 +762,9 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	TAILQ_INSERT_HEAD(&ns->hosts, host, link);
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		ctrlr->active_ns[nsid - 1] = true; 
+		ctrlr->active_ns[nsid - 1] = true;
+		nvmf_ctrlr_async_event_ns_notice(ctrlr); 
 	}
-
-	nvmf_ctrlr_async_event_ns_notice(ctrlr);
 
 	pthread_mutex_unlock(&subsystem->mutex);
 
@@ -811,10 +810,9 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	free(host);
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		ctrlr->active_ns[nsid - 1] = false; 
+		ctrlr->active_ns[nsid - 1] = false;
+		nvmf_ctrlr_async_event_ns_notice(ctrlr);
 	}
-
-	nvmf_ctrlr_async_event_ns_notice(ctrlr);
 
 	pthread_mutex_unlock(&subsystem->mutex);
 
