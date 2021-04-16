@@ -443,7 +443,7 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
 
     return client.call('nvmf_subsystem_remove_ns', params)
 
-def nvmf_ns_attach(client, nqn, nsid, host=None, tgt_name=None):
+def nvmf_ns_attach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
     """Attach controller of host to namespace
 
     Args:
@@ -464,9 +464,9 @@ def nvmf_ns_attach(client, nqn, nsid, host=None, tgt_name=None):
     if tgt_name:
         params['tgt_name'] = tgt_name
 
-    return client.call('nvmf_ns_attach', params)
+    return client.call('nvmf_ns_attach_ctrlr', params)
 
-def nvmf_ns_detach(client, nqn, nsid, host=None, tgt_name=None):
+def nvmf_ns_detach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
     """Detach controller of host from namespace
 
     Args:
@@ -487,7 +487,7 @@ def nvmf_ns_detach(client, nqn, nsid, host=None, tgt_name=None):
     if tgt_name:
         params['tgt_name'] = tgt_name
 
-    return client.call('nvmf_ns_detach', params)
+    return client.call('nvmf_ns_detach_ctrlr', params)
 
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
