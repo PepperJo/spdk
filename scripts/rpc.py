@@ -2068,7 +2068,7 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
     p = subparsers.add_parser('nvmf_ns_attach_ctrlr', help='Attach controllers of host to NVMe-oF namespace')
     p.add_argument('nqn', help='NVMe-oF subsystem NQN')
     p.add_argument('nsid', help='The requested NSID', type=int)
-    p.add_argument('host', help='Host NQN to attach (optional)')
+    p.add_argument('--host', help='Host NQN to attach (optional)')
     p.add_argument('-t', '--tgt_name', help='The name of the parent NVMe-oF target (optional)', type=str)
     p.set_defaults(func=nvmf_ns_attach_ctrlr)
 
@@ -2082,7 +2082,7 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
     p = subparsers.add_parser('nvmf_ns_detach_ctrlr', help='Detach controllers of host from NVMe-oF namespace')
     p.add_argument('nqn', help='NVMe-oF subsystem NQN')
     p.add_argument('nsid', help='The requested NSID', type=int)
-    p.add_argument('host', help='Host NQN to detach (optional)')
+    p.add_argument('--host', help='Host NQN to detach (optional)')
     p.add_argument('-t', '--tgt_name', help='The name of the parent NVMe-oF target (optional)', type=str)
     p.set_defaults(func=nvmf_ns_detach_ctrlr)
 
