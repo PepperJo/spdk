@@ -791,6 +791,90 @@ spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem)
 	return NULL;
 }
 
+struct spdk_nvmf_host *
+spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host = NULL;
+
+	TAILQ_FOREACH(host, &ns->hosts, link) {
+		if (strcmp(hostnqn, host->nqn) == 0) {
+			return host;
+		}
+	}
+
+	return NULL;
+}
+
+static void
+nvmf_ns_remove_host(struct spdk_nvmf_ns *ns, struct spdk_nvmf_host *host)
+{
+	TAILQ_REMOVE(&ns->hosts, host, link);
+	free(host);
+}
+
+int
+spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
+			uint32_t nsid,
+			const char *hostnqn,
+			enum spdk_nvmf_ns_attachment_type type,
+			bool attach)
+{
+	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
+	struct spdk_nvmf_host *host;
+
+	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
+	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
+		assert(false);
+		return -1;
+	}
+
+	if (hostnqn == NULL || !nvmf_valid_nqn(hostnqn)) {
+		return -EINVAL;
+	}
+
+	if (nsid == 0 || nsid > subsystem->max_nsid) {
+		return -EINVAL;
+	}
+
+	ns = subsystem->ns[nsid - 1];
+	if (!ns) {
+		return -ENOENT;
+	}
+
+	if (ns->attach_any_ctrlr) {
+		/* No individual host control */
+		return -EPERM;
+	}
+
+	if (type & SPDK_NVMF_NS_ATTACHMENT_COLD) {
+		host = spdk_nvmf_ns_find_host(ns, hostnqn);
+		if (attach && host == NULL) {
+			host = calloc(1, sizeof(*host));
+			if (!host) {
+				return -ENOMEM;
+			}
+			snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
+			TAILQ_INSERT_HEAD(&ns->hosts, host, link);
+		} else if (!attach && host != NULL) {
+			nvmf_ns_remove_host(ns, host);
+		}
+	}
+
+	if (type & SPDK_NVMF_NS_ATTACHMENT_HOT) {
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			if (strcmp(hostnqn, ctrlr->hostnqn) == 0 &&
+			    ctrlr->active_ns[nsid - 1] != attach) {
+				ctrlr->active_ns[nsid - 1] = attach;
+				nvmf_ctrlr_async_event_ns_notice(ctrlr);
+				nvmf_ctrlr_ns_changed(ctrlr, nsid);
+			}
+		}
+	}
+
+	return 0;
+}
+
 /* Must hold subsystem->mutex while calling this function */
 static struct spdk_nvmf_host *
 nvmf_subsystem_find_host(struct spdk_nvmf_subsystem *subsystem, const char *hostnqn)
@@ -1251,7 +1335,9 @@ nvmf_subsystem_ns_changed(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid)
 	struct spdk_nvmf_ctrlr *ctrlr;
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		nvmf_ctrlr_ns_changed(ctrlr, nsid);
+		if (nvmf_ctrlr_ns_is_active(ctrlr, nsid)) {
+			nvmf_ctrlr_ns_changed(ctrlr, nsid);
+		}
 	}
 }
 
@@ -1263,6 +1349,8 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 {
 	struct spdk_nvmf_transport *transport;
 	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_host *host, *tmp;
+	struct spdk_nvmf_ctrlr *ctrlr;
 
 	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
 	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
@@ -1286,6 +1374,10 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 
 	subsystem->ana_group[ns->anagrpid - 1]--;
 
+	TAILQ_FOREACH_SAFE(host, &ns->hosts, link, tmp) {
+		nvmf_ns_remove_host(ns, host);
+	}
+
 	free(ns->ptpl_file);
 	nvmf_ns_reservation_clear_all_registrants(ns);
 	spdk_bdev_module_release_bdev(ns->bdev);
@@ -1300,6 +1392,10 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 	}
 
 	nvmf_subsystem_ns_changed(subsystem, nsid);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		ctrlr->active_ns[nsid - 1] = false;
+	}
 
 	return 0;
 }
@@ -1512,6 +1608,7 @@ nvmf_ns_opts_copy(struct spdk_nvmf_ns_opts *opts,
 		memcpy(&opts->uuid, &user_opts->uuid, sizeof(opts->uuid));
 	}
 	SET_FIELD(anagrpid);
+	SET_FIELD(no_auto_attach);
 
 	opts->opts_size = user_opts->opts_size;
 
@@ -1542,6 +1639,7 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 	struct spdk_nvmf_transport *transport;
 	struct spdk_nvmf_ns_opts opts;
 	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
 	struct spdk_nvmf_reservation_info info = {0};
 	int rc;
 
@@ -1597,6 +1695,14 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 	if (ns == NULL) {
 		SPDK_ERRLOG("Namespace allocation failed\n");
 		return 0;
+	}
+
+	TAILQ_INIT(&ns->hosts);
+	ns->attach_any_ctrlr = !opts.no_auto_attach;
+	if (ns->attach_any_ctrlr) {
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			ctrlr->active_ns[opts.nsid - 1] = true;
+		}
 	}
 
 	rc = spdk_bdev_open_ext(bdev_name, true, nvmf_ns_event, ns, &ns->desc);

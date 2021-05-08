@@ -402,6 +402,7 @@ test_connect(void)
 	struct spdk_nvmf_transport transport;
 	struct spdk_nvmf_transport_ops tops = {};
 	struct spdk_nvmf_subsystem subsystem;
+	struct spdk_nvmf_ns *ns_arr[1] = { NULL };
 	struct spdk_nvmf_request req;
 	struct spdk_nvmf_qpair admin_qpair;
 	struct spdk_nvmf_qpair qpair;
@@ -461,6 +462,8 @@ test_connect(void)
 	subsystem.subtype = SPDK_NVMF_SUBTYPE_NVME;
 	subsystem.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
 	snprintf(subsystem.subnqn, sizeof(subsystem.subnqn), "%s", subnqn);
+	subsystem.ns = ns_arr;
+	subsystem.max_nsid = 1;
 
 	sgroups = calloc(subsystem.id + 1, sizeof(struct spdk_nvmf_subsystem_poll_group));
 	group.sgroups = sgroups;
@@ -849,6 +852,7 @@ test_get_ns_id_desc_list(void)
 	struct spdk_nvmf_request req;
 	struct spdk_nvmf_ns *ns_ptrs[1];
 	struct spdk_nvmf_ns ns;
+	bool active_ns[1];
 	union nvmf_h2c_msg cmd;
 	union nvmf_c2h_msg rsp;
 	struct spdk_bdev bdev;
@@ -870,6 +874,7 @@ test_get_ns_id_desc_list(void)
 	memset(&ctrlr, 0, sizeof(ctrlr));
 	ctrlr.subsys = &subsystem;
 	ctrlr.vcprop.cc.bits.en = 1;
+	ctrlr.active_ns = active_ns;
 
 	memset(&req, 0, sizeof(req));
 	req.qpair = &qpair;
@@ -890,7 +895,16 @@ test_get_ns_id_desc_list(void)
 	CU_ASSERT(rsp.nvme_cpl.status.sct == SPDK_NVME_SCT_GENERIC);
 	CU_ASSERT(rsp.nvme_cpl.status.sc == SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT);
 
+	/* Valid NSID, but ns is inactive */
+	active_ns[0] = false;
+	cmd.nvme_cmd.nsid = 1;
+	memset(&rsp, 0, sizeof(rsp));
+	CU_ASSERT(nvmf_ctrlr_process_admin_cmd(&req) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
+	CU_ASSERT(rsp.nvme_cpl.status.sct == SPDK_NVME_SCT_GENERIC);
+	CU_ASSERT(rsp.nvme_cpl.status.sc == SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT);
+
 	/* Valid NSID, but ns has no IDs defined */
+	active_ns[0] = true;
 	cmd.nvme_cmd.nsid = 1;
 	memset(&rsp, 0, sizeof(rsp));
 	CU_ASSERT(nvmf_ctrlr_process_admin_cmd(&req) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
@@ -976,7 +990,12 @@ test_identify_ns(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_transport transport = {};
 	struct spdk_nvmf_qpair admin_qpair = { .transport = &transport};
-	struct spdk_nvmf_ctrlr ctrlr = { .subsys = &subsystem, .admin_qpair = &admin_qpair };
+	bool active_ns[3] = {true, false, true};
+	struct spdk_nvmf_ctrlr ctrlr = {
+		.subsys = &subsystem,
+		.admin_qpair = &admin_qpair,
+		.active_ns = active_ns
+	};
 	struct spdk_nvme_cmd cmd = {};
 	struct spdk_nvme_cpl rsp = {};
 	struct spdk_nvme_ns_data nsdata = {};
@@ -1007,7 +1026,18 @@ test_identify_ns(void)
 	CU_ASSERT(rsp.status.sc == SPDK_NVME_SC_SUCCESS);
 	CU_ASSERT(nsdata.nsze == 1234);
 
-	/* Valid but inactive NSID 2 */
+	/* Valid but inactive NSID 1 */
+	active_ns[0] = false;
+	cmd.nsid = 1;
+	memset(&nsdata, 0, sizeof(nsdata));
+	memset(&rsp, 0, sizeof(rsp));
+	CU_ASSERT(spdk_nvmf_ctrlr_identify_ns(&ctrlr, &cmd, &rsp,
+					      &nsdata) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
+	CU_ASSERT(rsp.status.sct == SPDK_NVME_SCT_GENERIC);
+	CU_ASSERT(rsp.status.sc == SPDK_NVME_SC_SUCCESS);
+	CU_ASSERT(spdk_mem_all_zero(&nsdata, sizeof(nsdata)));
+
+	/* Valid but unallocated NSID 2 */
 	cmd.nsid = 2;
 	memset(&nsdata, 0, sizeof(nsdata));
 	memset(&rsp, 0, sizeof(rsp));
@@ -1055,8 +1085,12 @@ test_set_get_features(void)
 	struct spdk_nvmf_qpair admin_qpair = {};
 	enum spdk_nvme_ana_state ana_state[3];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
+	bool active_ns[3] = { true, false, true };
 	struct spdk_nvmf_ctrlr ctrlr = {
-		.subsys = &subsystem, .admin_qpair = &admin_qpair, .listener = &listener
+		.subsys = &subsystem,
+		.admin_qpair = &admin_qpair,
+		.listener = &listener,
+		.active_ns = active_ns
 	};
 	union nvmf_h2c_msg cmd = {};
 	union nvmf_c2h_msg rsp = {};
@@ -1495,12 +1529,14 @@ test_get_dif_ctx(void)
 	struct spdk_nvmf_ctrlr ctrlr = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *_ns = NULL;
+	bool active_ns[1] = { true };
 	struct spdk_bdev bdev = {};
 	union nvmf_h2c_msg cmd = {};
 	struct spdk_dif_ctx dif_ctx = {};
 	bool ret;
 
 	ctrlr.subsys = &subsystem;
+	ctrlr.active_ns = active_ns;
 
 	qpair.ctrlr = &ctrlr;
 
@@ -1669,6 +1705,7 @@ test_fused_compare_and_write(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = {};
@@ -1692,6 +1729,7 @@ test_fused_compare_and_write(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.num_sgroups = 1;
 	sgroups.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
@@ -2190,6 +2228,7 @@ test_nvmf_ctrlr_create_destruct(void)
 	struct spdk_nvmf_transport transport = {};
 	struct spdk_nvmf_transport_ops tops = {};
 	struct spdk_nvmf_subsystem subsystem = {};
+	struct spdk_nvmf_ns *ns_arr[1] = { NULL };
 	struct spdk_nvmf_request req = {};
 	struct spdk_nvmf_qpair qpair = {};
 	struct spdk_nvmf_ctrlr *ctrlr = NULL;
@@ -2227,6 +2266,7 @@ test_nvmf_ctrlr_create_destruct(void)
 	subsystem.subtype = SPDK_NVMF_SUBTYPE_NVME;
 	subsystem.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
 	snprintf(subsystem.subnqn, sizeof(subsystem.subnqn), "%s", subnqn);
+	subsystem.ns = ns_arr;
 
 	group.sgroups = sgroups;
 
@@ -2297,6 +2337,7 @@ test_nvmf_ctrlr_use_zcopy(void)
 	union nvmf_h2c_msg cmd = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	struct spdk_bdev bdev = {};
 	struct spdk_nvmf_poll_group group = {};
 	struct spdk_nvmf_subsystem_poll_group sgroups = {};
@@ -2313,6 +2354,7 @@ test_nvmf_ctrlr_use_zcopy(void)
 	subsystem.ns = (struct spdk_nvmf_ns **)&subsys_ns;
 
 	ctrlr.subsys = &subsystem;
+	ctrlr.active_ns = active_ns;
 
 	qpair.ctrlr = &ctrlr;
 	qpair.group = &group;
@@ -2377,6 +2419,7 @@ test_spdk_nvmf_request_zcopy_start(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = { .blockcnt = 100, .blocklen = 512};
@@ -2401,6 +2444,7 @@ test_spdk_nvmf_request_zcopy_start(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.thread = spdk_get_thread();
 	group.num_sgroups = 1;
@@ -2502,6 +2546,7 @@ test_zcopy_read(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = { .blockcnt = 100, .blocklen = 512};
@@ -2526,6 +2571,7 @@ test_zcopy_read(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.thread = spdk_get_thread();
 	group.num_sgroups = 1;
@@ -2589,6 +2635,7 @@ test_zcopy_write(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = { .blockcnt = 100, .blocklen = 512};
@@ -2613,6 +2660,7 @@ test_zcopy_write(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.thread = spdk_get_thread();
 	group.num_sgroups = 1;
@@ -2726,6 +2774,121 @@ test_nvmf_property_set(void)
 	CU_ASSERT(req.rsp->prop_get_rsp.value.u64 == 0xDDADBEEF);
 }
 
+struct spdk_nvmf_host *
+spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host = NULL;
+
+	TAILQ_FOREACH(host, &ns->hosts, link) {
+		if (strcmp(hostnqn, host->nqn) == 0) {
+			return host;
+		}
+	}
+
+	return NULL;
+}
+
+static void
+test_nvmf_ctrlr_ns_attachment(void)
+{
+	struct spdk_nvmf_subsystem subsystem = {};
+	struct spdk_nvmf_ns ns1 = {
+		.nsid = 1,
+		.attach_any_ctrlr = false
+	};
+	struct spdk_nvmf_ns ns3 = {
+		.nsid = 3,
+		.attach_any_ctrlr = false
+	};
+	struct spdk_nvmf_ctrlr ctrlrA = {
+		.subsys = &subsystem
+	};
+	struct spdk_nvmf_ctrlr ctrlrB = {
+		.subsys = &subsystem
+	};
+	struct spdk_nvmf_host *host;
+	uint32_t nsid;
+
+	subsystem.max_nsid = 3;
+	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
+	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
+
+	/* nsid = 2 -> unallocated, nsid = 1,3 -> allocated */
+	subsystem.ns[0] = &ns1;
+	subsystem.ns[2] = &ns3;
+
+	snprintf(ctrlrA.hostnqn, sizeof(ctrlrA.hostnqn), "nqn.2016-06.io.spdk:host1");
+	ctrlrA.active_ns = calloc(subsystem.max_nsid, sizeof(ctrlrA.active_ns));
+	SPDK_CU_ASSERT_FATAL(ctrlrA.active_ns != NULL);
+	snprintf(ctrlrB.hostnqn, sizeof(ctrlrB.hostnqn), "nqn.2016-06.io.spdk:host2");
+	ctrlrB.active_ns = calloc(subsystem.max_nsid, sizeof(ctrlrB.active_ns));
+	SPDK_CU_ASSERT_FATAL(ctrlrB.active_ns != NULL);
+
+	/* Do not auto attach and no cold attach of any ctrlr */
+	nsid = 1;
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	nsid = 3;
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+
+	/* Cold attach ctrlrA to namespace 1 */
+	nsid = 1;
+	host = calloc(1, sizeof(*host));
+	SPDK_CU_ASSERT_FATAL(host != NULL);
+	snprintf(host->nqn, sizeof(host->nqn), "%s", ctrlrA.hostnqn);
+	TAILQ_INSERT_HEAD(&ns1.hosts, host, link);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == host);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	nsid = 3;
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == host);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+
+	/* Detach ctrlrA from namespace 1 */
+	nsid = 1;
+	ctrlrA.active_ns[nsid - 1] = false;
+	TAILQ_REMOVE(&ns1.hosts, host, link);
+	free(host);
+
+	/* Auto attach any ctrlr to namespace 2 */
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	nsid = 3;
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	ns1.attach_any_ctrlr = true;
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	nsid = 1;
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	nsid = 3;
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrB);
+	nsid = 1;
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(ctrlrB.active_ns[nsid - 1]);
+	nsid = 3;
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns1, ctrlrA.hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&ns3, ctrlrA.hostnqn) == NULL);
+}
+
 int main(int argc, char **argv)
 {
 	CU_pSuite	suite = NULL;
@@ -2761,6 +2924,7 @@ int main(int argc, char **argv)
 	CU_ADD_TEST(suite, test_zcopy_read);
 	CU_ADD_TEST(suite, test_zcopy_write);
 	CU_ADD_TEST(suite, test_nvmf_property_set);
+	CU_ADD_TEST(suite, test_nvmf_ctrlr_ns_attachment);
 
 	allocate_threads(1);
 	set_thread(0);

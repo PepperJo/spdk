@@ -29,6 +29,8 @@
 	spdk_nvmf_tgt_find_subsystem;
 	spdk_nvmf_subsystem_get_first;
 	spdk_nvmf_subsystem_get_next;
+	spdk_nvmf_ns_find_host;
+	spdk_nvmf_ns_attachment;
 	spdk_nvmf_subsystem_add_host;
 	spdk_nvmf_subsystem_remove_host;
 	spdk_nvmf_subsystem_disconnect_host;

@@ -55,6 +55,7 @@ extern "C" {
 
 struct spdk_nvmf_tgt;
 struct spdk_nvmf_subsystem;
+struct spdk_nvmf_ns;
 struct spdk_nvmf_ctrlr;
 struct spdk_nvmf_qpair;
 struct spdk_nvmf_request;
@@ -485,6 +486,41 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_first(struct spdk_nvmf_tgt *
 struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem);
 
 /**
+ * Find host of which controllers should be attached to the namespace
+ *
+ * \param ns Namespace to search in.
+ * \param hostnqn The NQN of the host.
+ *
+ * \return a pointer to the NVMe-oF host on success, or NULL if not found.
+ */
+struct spdk_nvmf_host *spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn);
+
+enum spdk_nvmf_ns_attachment_type {
+	SPDK_NVMF_NS_ATTACHMENT_HOT = 0x1,
+	SPDK_NVMF_NS_ATTACHMENT_COLD = 0x2,
+	SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD = 0x3
+};
+
+/**
+ * Attach/Detach controller of host to/from namespace.
+ *
+ * May only be performed on subsystems in the PAUSED or INACTIVE states.
+ *
+ * \param subsystem Subsystem the namespace belong to.
+ * \param nsid Namespace ID to be removed.
+ * \param hostnqn The NQN for the host.
+ * \param type if host should be hot, cold or both attached/detached
+ * \param attach if true attach else detach
+ *
+ * \return 0 on success, or negated errno value on failure.
+ */
+int spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
+			    uint32_t nsid,
+			    const char *hostnqn,
+			    enum spdk_nvmf_ns_attachment_type type,
+			    bool attach);
+
+/**
  * Allow the given host NQN to connect to the given subsystem.
  *
  * \param subsystem Subsystem to add host to.
@@ -751,6 +787,13 @@ struct spdk_nvmf_ns_opts {
 	 * Set to be equal with the NSID if not specified.
 	 */
 	uint32_t anagrpid;
+
+	/**
+	 * Do not auto attach controllers
+	 *
+	 * False if not specified
+	 */
+	bool no_auto_attach;
 };
 
 /**
