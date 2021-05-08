@@ -54,6 +54,7 @@ extern "C" {
 
 struct spdk_nvmf_tgt;
 struct spdk_nvmf_subsystem;
+struct spdk_nvmf_ns;
 struct spdk_nvmf_ctrlr;
 struct spdk_nvmf_qpair;
 struct spdk_nvmf_request;
@@ -509,6 +510,14 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_first(struct spdk_nvmf_tgt *
  */
 struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem);
 
+
+
+struct spdk_nvmf_host *spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn);
+
+int spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+
+int spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+
 /**
  * Allow the given host NQN to connect to the given subsystem.
  *
@@ -761,6 +770,13 @@ struct spdk_nvmf_ns_opts {
 	 * Fill with 0s if not specified.
 	 */
 	struct spdk_uuid uuid;
+
+	/**
+	 * Do not auto attach controllers
+	 *
+	 * False if not specified
+	 */
+	bool no_auto_attach;
 };
 
 /**

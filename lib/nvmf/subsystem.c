@@ -702,6 +702,143 @@ spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem)
 	return NULL;
 }
 
+struct spdk_nvmf_host * 
+spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host = NULL;
+
+	TAILQ_FOREACH(host, &ns->hosts, link) {
+		if (strcmp(hostnqn, host->nqn) == 0) {
+			return host;
+		}
+	}
+
+	return NULL;
+}
+
+int
+spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host;
+	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
+
+	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
+		return -EINVAL;
+	}
+
+	pthread_mutex_lock(&subsystem->mutex);
+
+	if (nsid == 0 || nsid > subsystem->max_nsid) {
+		return -EINVAL;
+	}
+
+	ns = subsystem->ns[nsid - 1];
+	if (!ns) {
+		return -ENOENT;
+	}
+
+	if (hostnqn == NULL) {
+		/* Attach any ctrlr to this namespace */
+		if (!ns->attach_any_ctrlr) {
+			ns->attach_any_ctrlr = true;
+			TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+				if (!ctrlr->active_ns[nsid - 1]) {
+					ctrlr->active_ns[nsid - 1] = true;
+					nvmf_ctrlr_async_event_ns_notice(ctrlr);
+				}
+			}
+		}
+		pthread_mutex_unlock(&subsystem->mutex);
+		return 0;
+	}
+
+	if (spdk_nvmf_ns_find_host(ns, hostnqn)) {
+		/* This ns already attaches the specified host. */
+		pthread_mutex_unlock(&subsystem->mutex);
+		return 0;
+	}
+
+	host = calloc(1, sizeof(*host));
+	if (!host) {
+		pthread_mutex_unlock(&subsystem->mutex);
+		return -ENOMEM;
+	}
+
+	snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
+
+	TAILQ_INSERT_HEAD(&ns->hosts, host, link);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		if (strcmp(hostnqn, ctrlr->hostnqn) == 0 &&
+		    !ctrlr->active_ns[nsid - 1]) {
+			ctrlr->active_ns[nsid - 1] = true;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
+	}
+
+	pthread_mutex_unlock(&subsystem->mutex);
+
+	return 0;
+}
+
+int
+spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host;
+	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
+
+	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
+		return -EINVAL;
+	}
+
+	pthread_mutex_lock(&subsystem->mutex);
+
+	if (nsid == 0 || nsid > subsystem->max_nsid) {
+		return -EINVAL;
+	}
+
+	ns = subsystem->ns[nsid - 1];
+	if (!ns) {
+		return -ENOENT;
+	}
+
+	if (hostnqn == NULL) {
+		/* Do not attach any ctrlr to this namespace per default */
+		ns->attach_any_ctrlr = false;
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			if (ctrlr->active_ns[nsid - 1]) {
+				ctrlr->active_ns[nsid - 1] = false;
+				nvmf_ctrlr_async_event_ns_notice(ctrlr);
+			}
+		}
+		return 0;
+	}
+
+	host = spdk_nvmf_ns_find_host(ns, hostnqn);
+	if (host == NULL) {
+		/* This ns already does not attach the specified host */
+		pthread_mutex_unlock(&subsystem->mutex);
+		return -ENOENT;
+	}
+
+	TAILQ_REMOVE(&ns->hosts, host, link);
+	free(host);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		if (strcmp(hostnqn, ctrlr->hostnqn) == 0 && 
+		    ctrlr->active_ns[nsid - 1]) {
+			ctrlr->active_ns[nsid - 1] = false;
+			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+		}
+	}
+
+	pthread_mutex_unlock(&subsystem->mutex);
+
+	return 0;
+}
+
 /* Must hold subsystem->mutex while calling this function */
 static struct spdk_nvmf_host *
 nvmf_subsystem_find_host(struct spdk_nvmf_subsystem *subsystem, const char *hostnqn)
@@ -1410,6 +1547,8 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 		SPDK_ERRLOG("Namespace allocation failed\n");
 		return 0;
 	}
+
+	ns->attach_any_ctrlr = !opts.no_auto_attach;
 
 	rc = spdk_bdev_open_ext(bdev_name, true, nvmf_ns_event, ns, &ns->desc);
 	if (rc != 0) {

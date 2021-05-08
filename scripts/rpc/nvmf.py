@@ -383,7 +383,7 @@ def nvmf_subsystem_listener_set_ana_state(
     return client.call('nvmf_subsystem_listener_set_ana_state', params)
 
 
-def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None, nsid=None, nguid=None, eui64=None, uuid=None):
+def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None, nsid=None, nguid=None, eui64=None, uuid=None, no_auto_attach=None):
     """Add a namespace to a subsystem.
 
     Args:
@@ -414,6 +414,8 @@ def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None,
 
     if uuid:
         ns['uuid'] = uuid
+    
+    ns['no_auto_attach'] = True if no_auto_attach else False
 
     params = {'nqn': nqn,
               'namespace': ns}
@@ -442,6 +444,52 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
         params['tgt_name'] = tgt_name
 
     return client.call('nvmf_subsystem_remove_ns', params)
+
+def nvmf_ns_attach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
+    """Attach controller of host to namespace
+
+    Args:
+        nqn: Subsystem NQN.
+        nsid: Namespace ID.
+        host: Host NQN to attach (optional).
+        tgt_name: name of the parent NVMe-oF target (optional).
+
+    Returns:
+        True or False
+    """
+    params = {'nqn': nqn,
+              'nsid': nsid}
+
+    if host:
+        params['host'] = host
+
+    if tgt_name:
+        params['tgt_name'] = tgt_name
+
+    return client.call('nvmf_ns_attach_ctrlr', params)
+
+def nvmf_ns_detach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
+    """Detach controller of host from namespace
+
+    Args:
+        nqn: Subsystem NQN.
+        nsid: Namespace ID.
+        host: Host NQN to detach (optional).
+        tgt_name: name of the parent NVMe-oF target (optional).
+
+    Returns:
+        True or False
+    """
+    params = {'nqn': nqn,
+              'nsid': nsid}
+
+    if host:
+        params['host'] = host
+
+    if tgt_name:
+        params['tgt_name'] = tgt_name
+
+    return client.call('nvmf_ns_detach_ctrlr', params)
 
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
