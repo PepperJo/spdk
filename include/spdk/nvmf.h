@@ -770,6 +770,13 @@ struct spdk_nvmf_ns_opts {
 	 * Fill with 0s if not specified.
 	 */
 	struct spdk_uuid uuid;
+
+	/**
+	 * Do not auto attach controllers
+	 *
+	 * False if not specified
+	 */
+	bool no_auto_attach;
 };
 
 /**

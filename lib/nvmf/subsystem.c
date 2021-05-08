@@ -1548,6 +1548,8 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 		return 0;
 	}
 
+	ns->attach_any_ctrlr = !opts.no_auto_attach;
+
 	rc = spdk_bdev_open_ext(bdev_name, true, nvmf_ns_event, ns, &ns->desc);
 	if (rc != 0) {
 		SPDK_ERRLOG("Subsystem %s: bdev %s cannot be opened, error=%d\n",

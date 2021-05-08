@@ -1061,6 +1061,7 @@ struct spdk_nvmf_ns_params {
 	char nguid[16];
 	char eui64[8];
 	struct spdk_uuid uuid;
+	bool no_auto_attach;
 };
 
 static const struct spdk_json_object_decoder rpc_ns_params_decoders[] = {
@@ -1070,6 +1071,7 @@ static const struct spdk_json_object_decoder rpc_ns_params_decoders[] = {
 	{"nguid", offsetof(struct spdk_nvmf_ns_params, nguid), decode_ns_nguid, true},
 	{"eui64", offsetof(struct spdk_nvmf_ns_params, eui64), decode_ns_eui64, true},
 	{"uuid", offsetof(struct spdk_nvmf_ns_params, uuid), decode_ns_uuid, true},
+	{"no_auto_attach", offsetof(struct spdk_nvmf_ns_params, no_auto_attach), spdk_json_decode_bool, true},
 };
 
 static int
@@ -1186,6 +1188,8 @@ nvmf_rpc_ns_paused(struct spdk_nvmf_subsystem *subsystem,
 	if (!spdk_mem_all_zero(&ctx->ns_params.uuid, sizeof(ctx->ns_params.uuid))) {
 		ns_opts.uuid = ctx->ns_params.uuid;
 	}
+
+	ns_opts.no_auto_attach = ctx->ns_params.no_auto_attach;
 
 	ctx->ns_params.nsid = spdk_nvmf_subsystem_add_ns_ext(subsystem, ctx->ns_params.bdev_name,
 			      &ns_opts, sizeof(ns_opts),
