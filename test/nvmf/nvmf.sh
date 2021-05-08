@@ -53,6 +53,16 @@ fi
 run_test "nvmf_nmic" test/nvmf/target/nmic.sh "${TEST_ARGS[@]}"
 run_test "nvmf_fio_target" test/nvmf/target/fio.sh "${TEST_ARGS[@]}"
 run_test "nvmf_bdevio" test/nvmf/target/bdevio.sh "${TEST_ARGS[@]}"
+run_test "nvmf_invalid" test/nvmf/target/invalid.sh "${TEST_ARGS[@]}"
+run_test "nvmf_abort" test/nvmf/target/abort.sh "${TEST_ARGS[@]}"
+run_test "nvmf_ns_hotplug_stress" test/nvmf/target/ns_hotplug_stress.sh "${TEST_ARGS[@]}"
+run_test "nvmf_connect_stress" test/nvmf/target/connect_stress.sh "${TEST_ARGS[@]}"
+run_test "nvmf_delete_subsystem" test/nvmf/target/delete_subsystem.sh "${TEST_ARGS[@]}"
+run_test "nvmf_ns_attachment" test/nvmf/target/ns_attachment.sh "${TEST_ARGS[@]}"
+
+if [ $SPDK_TEST_VFIOUSER -eq 1 ]; then
+	run_test "nvmf_vfio_user" test/nvmf/target/nvmf_vfio_user.sh "${TEST_ARGS[@]}"
+fi
 
 if ! check_ip_is_soft_roce $NVMF_FIRST_TARGET_IP; then
 	# Soft-RoCE will return invalid values in the WC field after a qp has been

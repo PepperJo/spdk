@@ -334,6 +334,20 @@ nvmf_ctrlr_cdata_init(struct spdk_nvmf_transport *transport, struct spdk_nvmf_su
 	}
 }
 
+static void
+nvmf_ctrlr_init_active_ns(struct spdk_nvmf_ctrlr *ctrlr)
+{
+	struct spdk_nvmf_subsystem *subsystem = ctrlr->subsys;
+	struct spdk_nvmf_ns *ns;
+
+	for (ns = spdk_nvmf_subsystem_get_first_ns(subsystem); ns != NULL;
+	     ns = spdk_nvmf_subsystem_get_next_ns(subsystem, ns)) {
+		if (ns->attach_any_ctrlr || spdk_nvmf_ns_find_host(ns, ctrlr->hostnqn) != NULL) {
+			ctrlr->active_ns[ns->nsid - 1] = true;
+		}
+	}
+}
+
 static struct spdk_nvmf_ctrlr *
 nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 		  struct spdk_nvmf_request *req,
@@ -432,6 +446,13 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 	spdk_uuid_copy(&ctrlr->hostid, (struct spdk_uuid *)connect_data->hostid);
 	memcpy(ctrlr->hostnqn, connect_data->hostnqn, sizeof(ctrlr->hostnqn));
 
+	ctrlr->active_ns = calloc(subsystem->max_nsid, sizeof(*ctrlr->active_ns));
+	if (!ctrlr->active_ns) {
+		SPDK_ERRLOG("Failed to allocate active namespace array\n");
+		goto err_active_ns;
+	}
+	nvmf_ctrlr_init_active_ns(ctrlr);
+
 	ctrlr->vcprop.cap.raw = 0;
 	ctrlr->vcprop.cap.bits.cqr = 1; /* NVMe-oF specification required */
 	ctrlr->vcprop.cap.bits.mqes = transport->opts.max_queue_depth -
@@ -480,6 +501,8 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 
 	return ctrlr;
 err_listener:
+	free(ctrlr->active_ns);
+err_active_ns:
 	spdk_bit_array_free(&ctrlr->qpair_mask);
 err_qpair_mask:
 	free(ctrlr);
@@ -518,6 +541,7 @@ _nvmf_ctrlr_destruct(void *ctx)
 		STAILQ_REMOVE(&ctrlr->async_events, event, spdk_nvmf_async_event_completion, link);
 		free(event);
 	}
+	free(ctrlr->active_ns);
 	free(ctrlr);
 }
 
@@ -1671,9 +1695,9 @@ nvmf_ctrlr_get_features_reservation_notification_mask(struct spdk_nvmf_request *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL) {
-		SPDK_ERRLOG("Set Features - Invalid Namespace ID\n");
+		SPDK_ERRLOG("get Features - Invalid Namespace ID\n");
 		rsp->status.sc = SPDK_NVME_SC_INVALID_FIELD;
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
@@ -1701,7 +1725,7 @@ nvmf_ctrlr_set_features_reservation_notification_mask(struct spdk_nvmf_request *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL) {
 		SPDK_ERRLOG("Set Features - Invalid Namespace ID\n");
 		rsp->status.sc = SPDK_NVME_SC_INVALID_FIELD;
@@ -1722,7 +1746,7 @@ nvmf_ctrlr_get_features_reservation_persistence(struct spdk_nvmf_request *req)
 
 	SPDK_DEBUGLOG(nvmf, "Get Features - Reservation Persistence\n");
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	/* NSID with SPDK_NVME_GLOBAL_NS_TAG (=0xffffffff) also included */
 	if (ns == NULL) {
 		SPDK_ERRLOG("Get Features - Invalid Namespace ID\n");
@@ -1749,7 +1773,7 @@ nvmf_ctrlr_set_features_reservation_persistence(struct spdk_nvmf_request *req)
 
 	SPDK_DEBUGLOG(nvmf, "Set Features - Reservation Persistence\n");
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	ptpl = cmd->cdw11_bits.feat_rsv_persistence.bits.ptpl;
 
 	if (cmd->nsid != SPDK_NVME_GLOBAL_NS_TAG && ns && ns->ptpl_file) {
@@ -2162,7 +2186,7 @@ nvmf_ctrlr_get_ana_state_from_nsid(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
 	 * SPDK_NVMF_GLOBAL_NS_TAG, invalid, or for inactive namespace, return
 	 * the optimized state.
 	 */
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL) {
 		return SPDK_NVME_ANA_OPTIMIZED_STATE;
 	}
@@ -2559,7 +2583,7 @@ spdk_nvmf_ctrlr_identify_ns(struct spdk_nvmf_ctrlr *ctrlr,
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(subsystem, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		/*
 		 * Inactive namespaces should return a zero filled data structure.
@@ -2748,11 +2772,12 @@ spdk_nvmf_ctrlr_identify_ctrlr(struct spdk_nvmf_ctrlr *ctrlr, struct spdk_nvme_c
 }
 
 static int
-nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_subsystem *subsystem,
+nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_ctrlr *ctrlr,
 				   struct spdk_nvme_cmd *cmd,
 				   struct spdk_nvme_cpl *rsp,
 				   struct spdk_nvme_ns_list *ns_list)
 {
+	struct spdk_nvmf_subsystem *subsystem = ctrlr->subsys;
 	struct spdk_nvmf_ns *ns;
 	uint32_t count = 0;
 
@@ -2766,7 +2791,7 @@ nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_subsystem *subsystem,
 
 	for (ns = spdk_nvmf_subsystem_get_first_ns(subsystem); ns != NULL;
 	     ns = spdk_nvmf_subsystem_get_next_ns(subsystem, ns)) {
-		if (ns->opts.nsid <= cmd->nsid) {
+		if (ns->opts.nsid <= cmd->nsid || !nvmf_ctrlr_ns_is_active(ctrlr, ns->opts.nsid)) {
 			continue;
 		}
 
@@ -2809,7 +2834,7 @@ _add_ns_id_desc(void **buf_ptr, size_t *buf_remain,
 
 static int
 nvmf_ctrlr_identify_ns_id_descriptor_list(
-	struct spdk_nvmf_subsystem *subsystem,
+	struct spdk_nvmf_ctrlr *ctrlr,
 	struct spdk_nvme_cmd *cmd,
 	struct spdk_nvme_cpl *rsp,
 	void *id_desc_list, size_t id_desc_list_size)
@@ -2818,7 +2843,7 @@ nvmf_ctrlr_identify_ns_id_descriptor_list(
 	size_t buf_remain = id_desc_list_size;
 	void *buf_ptr = id_desc_list;
 
-	ns = _nvmf_subsystem_get_ns(subsystem, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		rsp->status.sct = SPDK_NVME_SCT_GENERIC;
 		rsp->status.sc = SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT;
@@ -2876,9 +2901,9 @@ nvmf_ctrlr_identify(struct spdk_nvmf_request *req)
 	case SPDK_NVME_IDENTIFY_CTRLR:
 		return spdk_nvmf_ctrlr_identify_ctrlr(ctrlr, req->data);
 	case SPDK_NVME_IDENTIFY_ACTIVE_NS_LIST:
-		return nvmf_ctrlr_identify_active_ns_list(subsystem, cmd, rsp, req->data);
+		return nvmf_ctrlr_identify_active_ns_list(ctrlr, cmd, rsp, req->data);
 	case SPDK_NVME_IDENTIFY_NS_ID_DESCRIPTOR_LIST:
-		return nvmf_ctrlr_identify_ns_id_descriptor_list(subsystem, cmd, rsp, req->data, req->length);
+		return nvmf_ctrlr_identify_ns_id_descriptor_list(ctrlr, cmd, rsp, req->data, req->length);
 	default:
 		goto invalid_cns;
 	}
@@ -3891,7 +3916,7 @@ nvmf_ctrlr_use_zcopy(struct spdk_nvmf_request *req)
 		return false;
 	}
 
-	ns = _nvmf_subsystem_get_ns(req->qpair->ctrlr->subsys, req->cmd->nvme_cmd.nsid);
+	ns = nvmf_ctrlr_get_active_ns(req->qpair->ctrlr, req->cmd->nvme_cmd.nsid);
 	if (ns == NULL || ns->bdev == NULL || !ns->zcopy) {
 		return false;
 	}
@@ -3953,7 +3978,7 @@ nvmf_ctrlr_process_io_cmd(struct spdk_nvmf_request *req)
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		SPDK_DEBUGLOG(nvmf, "Unsuccessful query for nsid %u\n", cmd->nsid);
 		response->status.sc = SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT;
@@ -4328,7 +4353,7 @@ nvmf_ctrlr_get_dif_ctx(struct spdk_nvmf_ctrlr *ctrlr, struct spdk_nvme_cmd *cmd,
 		return false;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		return false;
 	}
@@ -4424,7 +4449,7 @@ spdk_nvmf_request_get_bdev(uint32_t nsid, struct spdk_nvmf_request *req,
 	*desc = NULL;
 	*ch = NULL;
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		return -EINVAL;
 	}

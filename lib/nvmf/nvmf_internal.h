@@ -195,6 +195,10 @@ struct spdk_nvmf_ns {
 	bool ptpl_activated;
 	/* ZCOPY supported on bdev device */
 	bool zcopy;
+	/* Attach namespace to controllers of these hosts */
+	TAILQ_HEAD(, spdk_nvmf_host) hosts;
+	/* Attach namespace to any controller */
+	bool attach_any_ctrlr;
 };
 
 struct spdk_nvmf_ctrlr_feat {
@@ -235,6 +239,7 @@ struct spdk_nvmf_ctrlr {
 	uint16_t			cntlid;
 	char				hostnqn[SPDK_NVMF_NQN_MAX_LEN + 1];
 	struct spdk_nvmf_subsystem	*subsys;
+	bool				*active_ns;
 
 	struct spdk_nvmf_ctrlr_data	cdata;
 
@@ -495,6 +500,29 @@ void nvmf_qpair_abort_pending_zcopy_reqs(struct spdk_nvmf_qpair *qpair);
 void nvmf_qpair_free_aer(struct spdk_nvmf_qpair *qpair);
 
 int nvmf_ctrlr_abort_request(struct spdk_nvmf_request *req);
+
+static inline bool
+nvmf_ctrlr_ns_is_active(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
+{
+	return ctrlr->active_ns[nsid - 1];
+}
+
+static inline struct spdk_nvmf_ns *
+nvmf_ctrlr_get_active_ns(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
+{
+	struct spdk_nvmf_subsystem *subsystem = ctrlr->subsys;
+
+	/* NOTE: This implicitly also checks for 0, since 0 - 1 wraps around to UINT32_MAX. */
+	if (spdk_unlikely(nsid - 1 >= subsystem->max_nsid)) {
+		return NULL;
+	}
+
+	if (!nvmf_ctrlr_ns_is_active(ctrlr, nsid)) {
+		return NULL;
+	}
+
+	return subsystem->ns[nsid - 1];
+}
 
 static inline struct spdk_nvmf_ns *
 _nvmf_subsystem_get_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid)

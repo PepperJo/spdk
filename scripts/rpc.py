@@ -2181,7 +2181,8 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
                                        nguid=args.nguid,
                                        eui64=args.eui64,
                                        uuid=args.uuid,
-                                       anagrpid=args.anagrpid)
+                                       anagrpid=args.anagrpid,
+                                       no_auto_attach=args.no_auto_attach)
 
     p = subparsers.add_parser('nvmf_subsystem_add_ns', help='Add a namespace to an NVMe-oF subsystem')
     p.add_argument('nqn', help='NVMe-oF subsystem NQN')
@@ -2193,6 +2194,7 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
     p.add_argument('-e', '--eui64', help='Namespace EUI-64 identifier (optional)')
     p.add_argument('-u', '--uuid', help='Namespace UUID (optional)')
     p.add_argument('-a', '--anagrpid', help='ANA group ID (optional)', type=int)
+    p.add_argument('-i', '--no-auto-attach', action='store_true', help='Do not auto attach controller to namespace (optional)')
     p.set_defaults(func=nvmf_subsystem_add_ns)
 
     def nvmf_subsystem_remove_ns(args):
@@ -2206,6 +2208,42 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
     p.add_argument('nsid', help='The requested NSID', type=int)
     p.add_argument('-t', '--tgt-name', help='The name of the parent NVMe-oF target (optional)', type=str)
     p.set_defaults(func=nvmf_subsystem_remove_ns)
+
+    def nvmf_ns_attach_ctrlrs(args):
+        rpc.nvmf.nvmf_ns_attachment(True,
+                                    args.client,
+                                    nqn=args.nqn,
+                                    nsid=args.nsid,
+                                    host=args.host,
+                                    hot=args.hot,
+                                    cold=args.cold,
+                                    tgt_name=args.tgt_name)
+
+    def nvmf_ns_attachment_add_args(p):
+        p.add_argument('nqn', help='NVMe-oF subsystem NQN')
+        p.add_argument('nsid', help='The requested NSID', type=int)
+        p.add_argument('host', help='Host NQN to attach')
+        p.add_argument('-hot', action='store_true', help='hot attach/detach controller (optional)')
+        p.add_argument('-cold', action='store_true', help='cold attach/detach controller (optional)')
+        p.add_argument('-t', '--tgt-name', help='The name of the parent NVMe-oF target (optional)', type=str)
+
+    p = subparsers.add_parser('nvmf_ns_attach_ctrlrs', help='Attach controllers of host to NVMe-oF namespace')
+    nvmf_ns_attachment_add_args(p)
+    p.set_defaults(func=nvmf_ns_attach_ctrlrs)
+
+    def nvmf_ns_detach_ctrlrs(args):
+        rpc.nvmf.nvmf_ns_attachment(False,
+                                    args.client,
+                                    nqn=args.nqn,
+                                    nsid=args.nsid,
+                                    host=args.host,
+                                    hot=args.hot,
+                                    cold=args.cold,
+                                    tgt_name=args.tgt_name)
+
+    p = subparsers.add_parser('nvmf_ns_detach_ctrlrs', help='Detach controllers of host from NVMe-oF namespace')
+    nvmf_ns_attachment_add_args(p)
+    p.set_defaults(func=nvmf_ns_detach_ctrlrs)
 
     def nvmf_subsystem_add_host(args):
         rpc.nvmf.nvmf_subsystem_add_host(args.client,

@@ -358,7 +358,8 @@ def nvmf_subsystem_add_ns(client,
                           nguid=None,
                           eui64=None,
                           uuid=None,
-                          anagrpid=None):
+                          anagrpid=None,
+                          no_auto_attach=False):
     """Add a namespace to a subsystem.
 
     Args:
@@ -391,6 +392,9 @@ def nvmf_subsystem_add_ns(client,
     if uuid:
         ns['uuid'] = uuid
 
+    if no_auto_attach:
+        ns['no_auto_attach'] = no_auto_attach
+
     if anagrpid:
         ns['anagrpid'] = anagrpid
 
@@ -421,6 +425,39 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
         params['tgt_name'] = tgt_name
 
     return client.call('nvmf_subsystem_remove_ns', params)
+
+
+def nvmf_ns_attachment(attach, client, nqn, nsid, host, hot=False, cold=False, tgt_name=None):
+    """Attach/Detach controller of host to namespace
+
+    Args:
+        nqn: Subsystem NQN.
+        nsid: Namespace ID.
+        host: Host NQN to attach
+        hot: hot attach/detach controller
+        cold: cold attach/detach controller
+        tgt_name: name of the parent NVMe-oF target (optional).
+
+    Returns:
+        True or False
+    """
+    params = {'nqn': nqn,
+              'nsid': nsid,
+              'host': host}
+
+    if hot:
+        params['hot'] = hot
+
+    if cold:
+        params['cold'] = cold
+
+    if tgt_name:
+        params['tgt_name'] = tgt_name
+
+    if attach:
+        return client.call('nvmf_ns_attach_ctrlrs', params)
+    else:
+        return client.call('nvmf_ns_detach_ctrlrs', params)
 
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
