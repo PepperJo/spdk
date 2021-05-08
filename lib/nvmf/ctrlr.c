@@ -321,6 +321,25 @@ nvmf_ctrlr_cdata_init(struct spdk_nvmf_transport *transport, struct spdk_nvmf_su
 	}
 }
 
+static bool
+nvmf_ctrlr_ns_is_active(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid) {
+	return ctrlr->active_ns[nsid - 1];
+}
+
+static void
+nvmf_ctrlr_init_active_ns(struct spdk_nvmf_ctrlr *ctrlr)
+{
+	struct spdk_nvmf_subsystem *subsystem = ctrlr->subsys;
+	struct spdk_nvmf_ns *ns;
+
+	for (ns = spdk_nvmf_subsystem_get_first_ns(subsystem); ns != NULL;
+	     ns = spdk_nvmf_subsystem_get_next_ns(subsystem, ns)) {
+		if (ns->attach_any_ctrlr || spdk_nvmf_ns_find_host(ns, ctrlr->hostnqn) != NULL) {
+			ctrlr->active_ns[ns->nsid - 1] = true;
+		}
+	}
+}
+
 static struct spdk_nvmf_ctrlr *
 nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 		  struct spdk_nvmf_request *req,
@@ -340,6 +359,12 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 	STAILQ_INIT(&ctrlr->async_events);
 	TAILQ_INIT(&ctrlr->log_head);
 	ctrlr->subsys = subsystem;
+	ctrlr->active_ns = calloc(subsystem->max_nsid, sizeof(*ctrlr->active_ns));
+	if (!ctrlr->active_ns) {
+		SPDK_ERRLOG("Failed to allocate active namespace array\n");
+		goto err_active_ns;
+	}
+	nvmf_ctrlr_init_active_ns(ctrlr);
 	ctrlr->thread = req->qpair->group->thread;
 	ctrlr->disconnect_in_progress = false;
 
@@ -460,6 +485,8 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 err_listener:
 	spdk_bit_array_free(&ctrlr->qpair_mask);
 err_qpair_mask:
+	free(ctrlr->active_ns);
+err_active_ns:
 	free(ctrlr);
 	return NULL;
 }
@@ -2513,11 +2540,12 @@ spdk_nvmf_ctrlr_identify_ctrlr(struct spdk_nvmf_ctrlr *ctrlr, struct spdk_nvme_c
 }
 
 static int
-nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_subsystem *subsystem,
+nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_ctrlr *ctrlr,
 				   struct spdk_nvme_cmd *cmd,
 				   struct spdk_nvme_cpl *rsp,
 				   struct spdk_nvme_ns_list *ns_list)
 {
+	struct spdk_nvmf_subsystem *subsystem = ctrlr->subsys;
 	struct spdk_nvmf_ns *ns;
 	uint32_t count = 0;
 
@@ -2531,7 +2559,7 @@ nvmf_ctrlr_identify_active_ns_list(struct spdk_nvmf_subsystem *subsystem,
 
 	for (ns = spdk_nvmf_subsystem_get_first_ns(subsystem); ns != NULL;
 	     ns = spdk_nvmf_subsystem_get_next_ns(subsystem, ns)) {
-		if (ns->opts.nsid <= cmd->nsid) {
+		if (ns->opts.nsid <= cmd->nsid || !nvmf_ctrlr_ns_is_active(ctrlr, ns->opts.nsid)) {
 			continue;
 		}
 
@@ -2641,7 +2669,7 @@ nvmf_ctrlr_identify(struct spdk_nvmf_request *req)
 	case SPDK_NVME_IDENTIFY_CTRLR:
 		return spdk_nvmf_ctrlr_identify_ctrlr(ctrlr, req->data);
 	case SPDK_NVME_IDENTIFY_ACTIVE_NS_LIST:
-		return nvmf_ctrlr_identify_active_ns_list(subsystem, cmd, rsp, req->data);
+		return nvmf_ctrlr_identify_active_ns_list(ctrlr, cmd, rsp, req->data);
 	case SPDK_NVME_IDENTIFY_NS_ID_DESCRIPTOR_LIST:
 		return nvmf_ctrlr_identify_ns_id_descriptor_list(subsystem, cmd, rsp, req->data, req->length);
 	default:
@@ -4081,6 +4109,22 @@ spdk_nvmf_request_exec(struct spdk_nvmf_request *req)
 
 	/* Place the request on the outstanding list so we can keep track of it */
 	nvmf_add_to_outstanding_queue(req);
+
+	/* check if namespace is attached if commands uses NSID */
+	if (req->cmd->nvmf_cmd.opcode != SPDK_NVME_OPC_FABRIC && qpair->ctrlr) {
+		nsid = req->cmd->nvme_cmd.nsid;
+		if (nsid != 0 && nsid != SPDK_NVME_GLOBAL_NS_TAG && !nvmf_ctrlr_ns_is_active(qpair->ctrlr, nsid)) {
+			/* Namespace not attached 
+			 * 6.1.5 Unless otherwise noted, specifying an inactive NSID in a command that
+			 * uses the Namespace Identifier (NSID) field shall cause the controller to 
+			 * abort the command with status Invalid Field in Command.
+			 */
+			req->rsp->nvme_cpl.status.sct = SPDK_NVME_SCT_GENERIC;
+			req->rsp->nvme_cpl.status.sc = SPDK_NVME_SC_INVALID_FIELD;
+			_nvmf_request_complete(req);
+			return;
+		}
+	}
 
 	if (spdk_unlikely(req->cmd->nvmf_cmd.opcode == SPDK_NVME_OPC_FABRIC)) {
 		status = nvmf_ctrlr_process_fabrics_cmd(req);
