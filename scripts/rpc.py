@@ -2045,7 +2045,7 @@ Format: 'user:u1 secret:s1 muser:mu1 msecret:ms1,user:u2 secret:s2 muser:mu2 mse
     p.add_argument('-g', '--nguid', help='Namespace globally unique identifier (optional)')
     p.add_argument('-e', '--eui64', help='Namespace EUI-64 identifier (optional)')
     p.add_argument('-u', '--uuid', help='Namespace UUID (optional)')
-    p.add_argument('--no-auto-attach', help='Do not auto attach controller to namespace (optional)')
+    p.add_argument('-a', '--no-auto-attach', action='store_true', help='Do not auto attach controller to namespace (optional)')
     p.set_defaults(func=nvmf_subsystem_add_ns)
 
     def nvmf_subsystem_remove_ns(args):

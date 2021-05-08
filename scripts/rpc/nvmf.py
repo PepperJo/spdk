@@ -383,7 +383,7 @@ def nvmf_subsystem_listener_set_ana_state(
     return client.call('nvmf_subsystem_listener_set_ana_state', params)
 
 
-def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None, nsid=None, nguid=None, eui64=None, uuid=None):
+def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None, nsid=None, nguid=None, eui64=None, uuid=None, no_auto_attach=None):
     """Add a namespace to a subsystem.
 
     Args:
@@ -414,6 +414,8 @@ def nvmf_subsystem_add_ns(client, nqn, bdev_name, tgt_name=None, ptpl_file=None,
 
     if uuid:
         ns['uuid'] = uuid
+    
+    ns['no_auto_attach'] = True if no_auto_attach else False
 
     params = {'nqn': nqn,
               'namespace': ns}
