@@ -1998,7 +1998,7 @@ nvmf_ctrlr_get_ana_state_from_nsid(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
 	 * SPDK_NVMF_GLOBAL_NS_TAG, invalid, or for inactive namespace, return
 	 * the optimized state.
 	 */
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL) {
 		return SPDK_NVME_ANA_OPTIMIZED_STATE;
 	}
@@ -2367,7 +2367,7 @@ spdk_nvmf_ctrlr_identify_ns(struct spdk_nvmf_ctrlr *ctrlr,
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(subsystem, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		/*
 		 * Inactive namespaces should return a zero filled data structure.
@@ -2602,7 +2602,7 @@ _add_ns_id_desc(void **buf_ptr, size_t *buf_remain,
 
 static int
 nvmf_ctrlr_identify_ns_id_descriptor_list(
-	struct spdk_nvmf_subsystem *subsystem,
+	struct spdk_nvmf_ctrlr *ctrlr,
 	struct spdk_nvme_cmd *cmd,
 	struct spdk_nvme_cpl *rsp,
 	void *id_desc_list, size_t id_desc_list_size)
@@ -2611,7 +2611,7 @@ nvmf_ctrlr_identify_ns_id_descriptor_list(
 	size_t buf_remain = id_desc_list_size;
 	void *buf_ptr = id_desc_list;
 
-	ns = _nvmf_subsystem_get_ns(subsystem, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		rsp->status.sct = SPDK_NVME_SCT_GENERIC;
 		rsp->status.sc = SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT;
@@ -2671,7 +2671,7 @@ nvmf_ctrlr_identify(struct spdk_nvmf_request *req)
 	case SPDK_NVME_IDENTIFY_ACTIVE_NS_LIST:
 		return nvmf_ctrlr_identify_active_ns_list(ctrlr, cmd, rsp, req->data);
 	case SPDK_NVME_IDENTIFY_NS_ID_DESCRIPTOR_LIST:
-		return nvmf_ctrlr_identify_ns_id_descriptor_list(subsystem, cmd, rsp, req->data, req->length);
+		return nvmf_ctrlr_identify_ns_id_descriptor_list(ctrlr, cmd, rsp, req->data, req->length);
 	default:
 		goto invalid_cns;
 	}
@@ -3765,7 +3765,7 @@ nvmf_ctrlr_process_io_cmd(struct spdk_nvmf_request *req)
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		SPDK_DEBUGLOG(nvmf, "Unsuccessful query for nsid %u\n", cmd->nsid);
 		response->status.sc = SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT;
@@ -4109,22 +4109,6 @@ spdk_nvmf_request_exec(struct spdk_nvmf_request *req)
 
 	/* Place the request on the outstanding list so we can keep track of it */
 	nvmf_add_to_outstanding_queue(req);
-
-	/* check if namespace is attached if commands uses NSID */
-	if (req->cmd->nvmf_cmd.opcode != SPDK_NVME_OPC_FABRIC && qpair->ctrlr) {
-		nsid = req->cmd->nvme_cmd.nsid;
-		if (nsid != 0 && nsid != SPDK_NVME_GLOBAL_NS_TAG && !nvmf_ctrlr_ns_is_active(qpair->ctrlr, nsid)) {
-			/* Namespace not attached 
-			 * 6.1.5 Unless otherwise noted, specifying an inactive NSID in a command that
-			 * uses the Namespace Identifier (NSID) field shall cause the controller to 
-			 * abort the command with status Invalid Field in Command.
-			 */
-			req->rsp->nvme_cpl.status.sct = SPDK_NVME_SCT_GENERIC;
-			req->rsp->nvme_cpl.status.sc = SPDK_NVME_SC_INVALID_FIELD;
-			_nvmf_request_complete(req);
-			return;
-		}
-	}
 
 	if (spdk_unlikely(req->cmd->nvmf_cmd.opcode == SPDK_NVME_OPC_FABRIC)) {
 		status = nvmf_ctrlr_process_fabrics_cmd(req);

@@ -835,6 +835,7 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 				if (!ctrlr->active_ns[nsid - 1]) {
 					ctrlr->active_ns[nsid - 1] = true;
 					nvmf_ctrlr_async_event_ns_notice(ctrlr);
+					nvmf_ctrlr_ns_changed(ctrlr, nsid);
 				}
 			}
 		}
@@ -863,6 +864,7 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 		    !ctrlr->active_ns[nsid - 1]) {
 			ctrlr->active_ns[nsid - 1] = true;
 			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+			nvmf_ctrlr_ns_changed(ctrlr, nsid);
 		}
 	}
 
@@ -900,6 +902,7 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 			if (ctrlr->active_ns[nsid - 1]) {
 				ctrlr->active_ns[nsid - 1] = false;
 				nvmf_ctrlr_async_event_ns_notice(ctrlr);
+				nvmf_ctrlr_ns_changed(ctrlr, nsid);
 			}
 		}
 		return 0;
@@ -920,6 +923,7 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 		    ctrlr->active_ns[nsid - 1]) {
 			ctrlr->active_ns[nsid - 1] = false;
 			nvmf_ctrlr_async_event_ns_notice(ctrlr);
+			nvmf_ctrlr_ns_changed(ctrlr, nsid);
 		}
 	}
 
@@ -1388,7 +1392,9 @@ nvmf_subsystem_ns_changed(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid)
 	struct spdk_nvmf_ctrlr *ctrlr;
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		nvmf_ctrlr_ns_changed(ctrlr, nsid);
+		if (nvmf_ctrlr_ns_is_active(ctrlr, nsid)) {
+			nvmf_ctrlr_ns_changed(ctrlr, nsid);
+		}
 	}
 }
 
