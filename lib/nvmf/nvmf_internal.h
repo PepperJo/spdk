@@ -452,6 +452,11 @@ void nvmf_qpair_free_aer(struct spdk_nvmf_qpair *qpair);
 
 int nvmf_ctrlr_abort_request(struct spdk_nvmf_request *req);
 
+static inline bool
+nvmf_ctrlr_ns_is_active(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid) {
+	return ctrlr->active_ns[nsid - 1];
+}
+
 static inline struct spdk_nvmf_ns *
 nvmf_ctrlr_get_active_ns(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
 {

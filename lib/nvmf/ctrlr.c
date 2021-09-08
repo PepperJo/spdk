@@ -321,11 +321,6 @@ nvmf_ctrlr_cdata_init(struct spdk_nvmf_transport *transport, struct spdk_nvmf_su
 	}
 }
 
-static bool
-nvmf_ctrlr_ns_is_active(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid) {
-	return ctrlr->active_ns[nsid - 1];
-}
-
 static void
 nvmf_ctrlr_init_active_ns(struct spdk_nvmf_ctrlr *ctrlr)
 {
@@ -1605,9 +1600,9 @@ nvmf_ctrlr_get_features_reservation_notification_mask(struct spdk_nvmf_request *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL) {
-		SPDK_ERRLOG("Set Features - Invalid Namespace ID\n");
+		SPDK_ERRLOG("get Features - Invalid Namespace ID\n");
 		rsp->status.sc = SPDK_NVME_SC_INVALID_FIELD;
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
@@ -1635,7 +1630,7 @@ nvmf_ctrlr_set_features_reservation_notification_mask(struct spdk_nvmf_request *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr->subsys, cmd->nsid);
 	if (ns == NULL) {
 		SPDK_ERRLOG("Set Features - Invalid Namespace ID\n");
 		rsp->status.sc = SPDK_NVME_SC_INVALID_FIELD;
@@ -1656,7 +1651,7 @@ nvmf_ctrlr_get_features_reservation_persistence(struct spdk_nvmf_request *req)
 
 	SPDK_DEBUGLOG(nvmf, "Get Features - Reservation Persistence\n");
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	/* NSID with SPDK_NVME_GLOBAL_NS_TAG (=0xffffffff) also included */
 	if (ns == NULL) {
 		SPDK_ERRLOG("Get Features - Invalid Namespace ID\n");
@@ -1683,7 +1678,7 @@ nvmf_ctrlr_set_features_reservation_persistence(struct spdk_nvmf_request *req)
 
 	SPDK_DEBUGLOG(nvmf, "Set Features - Reservation Persistence\n");
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	ptpl = cmd->cdw11_bits.feat_rsv_persistence.bits.ptpl;
 
 	if (cmd->nsid != SPDK_NVME_GLOBAL_NS_TAG && ns && ns->ptpl_file) {
@@ -3652,7 +3647,7 @@ nvmf_ctrlr_use_zcopy(struct spdk_nvmf_request *req)
 		return false;
 	}
 
-	ns = _nvmf_subsystem_get_ns(req->qpair->ctrlr->subsys, req->cmd->nvme_cmd.nsid);
+	ns = nvmf_ctrlr_get_active_ns(req->qpair->ctrlr, req->cmd->nvme_cmd.nsid);
 	if (ns == NULL || ns->bdev == NULL || !ns->zcopy) {
 		return false;
 	}
@@ -4134,7 +4129,7 @@ nvmf_ctrlr_get_dif_ctx(struct spdk_nvmf_ctrlr *ctrlr, struct spdk_nvme_cmd *cmd,
 		return false;
 	}
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		return false;
 	}
@@ -4230,7 +4225,7 @@ spdk_nvmf_request_get_bdev(uint32_t nsid, struct spdk_nvmf_request *req,
 	*desc = NULL;
 	*ch = NULL;
 
-	ns = _nvmf_subsystem_get_ns(ctrlr->subsys, nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, nsid);
 	if (ns == NULL || ns->bdev == NULL) {
 		return -EINVAL;
 	}
