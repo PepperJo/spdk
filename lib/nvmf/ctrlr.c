@@ -1630,7 +1630,7 @@ nvmf_ctrlr_set_features_reservation_notification_mask(struct spdk_nvmf_request *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	ns = nvmf_ctrlr_get_active_ns(ctrlr->subsys, cmd->nsid);
+	ns = nvmf_ctrlr_get_active_ns(ctrlr, cmd->nsid);
 	if (ns == NULL) {
 		SPDK_ERRLOG("Set Features - Invalid Namespace ID\n");
 		rsp->status.sc = SPDK_NVME_SC_INVALID_FIELD;
