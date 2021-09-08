@@ -475,7 +475,7 @@ nvmf_ctrlr_get_active_ns(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
 }
 
 static inline struct spdk_nvmf_ns *
-nvmf_subsystem_get_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid)
+_nvmf_subsystem_get_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid)
 {
 	/* NOTE: This implicitly also checks for 0, since 0 - 1 wraps around to UINT32_MAX. */
 	if (spdk_unlikely(nsid - 1 >= subsystem->max_nsid)) {
