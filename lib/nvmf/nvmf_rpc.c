@@ -1530,7 +1530,7 @@ nvmf_rpc_ns_attachment(struct spdk_jsonrpc_request *request,
 		   const struct spdk_json_val *params,
 		   bool attach) 
 {
-struct nvmf_rpc_ns_attachment_ctx *ctx;
+	struct nvmf_rpc_ns_attachment_ctx *ctx;
 	struct spdk_nvmf_subsystem *subsystem;
 	struct spdk_nvmf_tgt *tgt;
 	int rc;

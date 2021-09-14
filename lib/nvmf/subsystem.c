@@ -1412,6 +1412,8 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 {
 	struct spdk_nvmf_transport *transport;
 	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_host *host;
+	struct spdk_nvmf_ctrlr *ctrlr;
 
 	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
 	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
