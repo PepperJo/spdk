@@ -1461,6 +1461,8 @@ struct nvmf_rpc_ns_attachment_ctx {
 	uint32_t nsid;
 	char *host;
 	char* tgt_name;
+	bool attach;
+	bool response_sent;
 };
 
 static const struct spdk_json_object_decoder nvmf_rpc_ns_attachment_decoder[] = {
@@ -1480,10 +1482,55 @@ nvmf_rpc_ns_attachment_ctx_free(struct nvmf_rpc_ns_attachment_ctx *ctx)
 }
 
 static void
-rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
-		   const struct spdk_json_val *params)
+nvmf_rpc_ns_attachment_resumed(struct spdk_nvmf_subsystem *subsystem,
+			   void *cb_arg, int status)
 {
-	struct nvmf_rpc_ns_attachment_ctx *ctx;
+	struct nvmf_rpc_ns_attachment_ctx *ctx = cb_arg;
+	struct spdk_jsonrpc_request *request = ctx->request;
+	bool response_sent = ctx->response_sent;
+
+	nvmf_rpc_ns_attachment_ctx_free(ctx);
+
+	if (response_sent) {
+		return;
+	}
+
+	spdk_jsonrpc_send_bool_response(request, true);
+}
+
+static void
+nvmf_rpc_ns_attachment_paused(struct spdk_nvmf_subsystem *subsystem,
+			  void *cb_arg, int status)
+{
+	struct nvmf_rpc_ns_attachment_ctx *ctx = cb_arg;
+	int ret;
+
+	if (ctx->attach) {
+		ret = spdk_nvmf_ns_attach_ctrlr(subsystem, ctx->nsid, ctx->host);
+	} else {
+		ret = spdk_nvmf_ns_detach_ctrlr(subsystem, ctx->nsid, ctx->host);
+	}
+	if (ret < 0) {
+		SPDK_ERRLOG("Unable to attach/detach %s to namespace ID %u\n", ctx->host, ctx->nsid);
+		spdk_jsonrpc_send_error_response(ctx->request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		ctx->response_sent = true;
+	}
+
+	if (spdk_nvmf_subsystem_resume(subsystem, nvmf_rpc_ns_attachment_resumed, ctx)) {
+		if (!ctx->response_sent) {
+			spdk_jsonrpc_send_error_response(ctx->request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
+		}
+		nvmf_rpc_ns_attachment_ctx_free(ctx);
+	}
+}
+
+static void
+nvmf_rpc_ns_attachment(struct spdk_jsonrpc_request *request,
+		   const struct spdk_json_val *params,
+		   bool attach) 
+{
+struct nvmf_rpc_ns_attachment_ctx *ctx;
 	struct spdk_nvmf_subsystem *subsystem;
 	struct spdk_nvmf_tgt *tgt;
 	int rc;
@@ -1493,6 +1540,7 @@ rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
 		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Out of memory");
 		return;
 	}
+	ctx->attach = attach;
 
 	if (spdk_json_decode_object(params, nvmf_rpc_ns_attachment_decoder,
 				    SPDK_COUNTOF(nvmf_rpc_ns_attachment_decoder),
@@ -1522,16 +1570,23 @@ rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	rc = spdk_nvmf_ns_attach_ctrlr(subsystem, ctx->nsid, ctx->host);
+	rc = spdk_nvmf_subsystem_pause(subsystem, ctx->nsid, nvmf_rpc_ns_attachment_paused, ctx);
 	if (rc != 0) {
-		SPDK_ERRLOG("Unable to attach %s to namespace ID %u\n", ctx->host, ctx->nsid);
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
+		if (rc == -EBUSY) {
+			spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+							 "subsystem busy, retry later.\n");
+		} else {
+			spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
+		}
 		nvmf_rpc_ns_attachment_ctx_free(ctx);
-		return;
 	}
+}
 
-	spdk_jsonrpc_send_bool_response(request, true);
-	nvmf_rpc_ns_attachment_ctx_free(ctx);
+static void
+rpc_nvmf_ns_attach_ctrlr(struct spdk_jsonrpc_request *request,
+		   const struct spdk_json_val *params)
+{
+	nvmf_rpc_ns_attachment(request, params, true);
 }
 SPDK_RPC_REGISTER("nvmf_ns_attach_ctrlr", rpc_nvmf_ns_attach_ctrlr, SPDK_RPC_RUNTIME)
 
@@ -1539,55 +1594,7 @@ static void
 rpc_nvmf_ns_detach_ctrlr(struct spdk_jsonrpc_request *request,
 		   const struct spdk_json_val *params)
 {
-	struct nvmf_rpc_ns_attachment_ctx *ctx;
-	struct spdk_nvmf_subsystem *subsystem;
-	struct spdk_nvmf_tgt *tgt;
-	int rc;
-
-	ctx = calloc(1, sizeof(*ctx));
-	if (!ctx) {
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Out of memory");
-		return;
-	}
-
-	if (spdk_json_decode_object(params, nvmf_rpc_ns_attachment_decoder,
-				    SPDK_COUNTOF(nvmf_rpc_ns_attachment_decoder),
-				    ctx)) {
-		SPDK_ERRLOG("spdk_json_decode_object failed\n");
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
-		nvmf_rpc_ns_attachment_ctx_free(ctx);
-		return;
-	}
-
-	ctx->request = request;
-
-	tgt = spdk_nvmf_get_tgt(ctx->tgt_name);
-	if (!tgt) {
-		SPDK_ERRLOG("Unable to find a target object.\n");
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						 "Unable to find a target.");
-		nvmf_rpc_ns_attachment_ctx_free(ctx);
-		return;
-	}
-
-	subsystem = spdk_nvmf_tgt_find_subsystem(tgt, ctx->nqn);
-	if (!subsystem) {
-		SPDK_ERRLOG("Unable to find subsystem with NQN %s\n", ctx->nqn);
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS, "Invalid parameters");
-		nvmf_rpc_ns_attachment_ctx_free(ctx);
-		return;
-	}
-
-	rc = spdk_nvmf_ns_detach_ctrlr(subsystem, ctx->nsid, ctx->host);
-	if (rc != 0) {
-		SPDK_ERRLOG("Unable to detach %s to namespace ID %u\n", ctx->host, ctx->nsid);
-		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR, "Internal error");
-		nvmf_rpc_ns_attachment_ctx_free(ctx);
-		return;
-	}
-
-	spdk_jsonrpc_send_bool_response(request, true);
-	nvmf_rpc_ns_attachment_ctx_free(ctx);
+	nvmf_rpc_ns_attachment(request, params, false);
 }
 SPDK_RPC_REGISTER("nvmf_ns_detach_ctrlr", rpc_nvmf_ns_detach_ctrlr, SPDK_RPC_RUNTIME)
 

@@ -489,8 +489,30 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsys
 
 struct spdk_nvmf_host *spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn);
 
+/**
+ * Attach controller of host to namespace.
+ *
+ * May only be performed on subsystems in the PAUSED or INACTIVE states.
+ *
+ * \param subsystem Subsystem the namespace belong to.
+ * \param nsid Namespace ID to be removed.
+ * \param hostnqn The NQN for the host.
+ *
+ * \return 0 on success, or negated errno value on failure.
+ */
 int spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
 
+/**
+ * Detach controller of host from namespace
+ *
+ * May only be performed on subsystems in the PAUSED or INACTIVE states.
+ *
+ * \param subsystem Subsystem the namespace belong to.
+ * \param nsid Namespace ID to be removed.
+ * \param hostnqn The NQN for the host.
+ *
+ * \return 0 on success, or negated errno value on failure.
+ */
 int spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
 
 /**

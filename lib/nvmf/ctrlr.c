@@ -354,12 +354,6 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 	STAILQ_INIT(&ctrlr->async_events);
 	TAILQ_INIT(&ctrlr->log_head);
 	ctrlr->subsys = subsystem;
-	ctrlr->active_ns = calloc(subsystem->max_nsid, sizeof(*ctrlr->active_ns));
-	if (!ctrlr->active_ns) {
-		SPDK_ERRLOG("Failed to allocate active namespace array\n");
-		goto err_active_ns;
-	}
-	nvmf_ctrlr_init_active_ns(ctrlr);
 	ctrlr->thread = req->qpair->group->thread;
 	ctrlr->disconnect_in_progress = false;
 
@@ -431,6 +425,13 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 	spdk_uuid_copy(&ctrlr->hostid, (struct spdk_uuid *)connect_data->hostid);
 	memcpy(ctrlr->hostnqn, connect_data->hostnqn, sizeof(ctrlr->hostnqn));
 
+	ctrlr->active_ns = calloc(subsystem->max_nsid, sizeof(*ctrlr->active_ns));
+	if (!ctrlr->active_ns) {
+		SPDK_ERRLOG("Failed to allocate active namespace array\n");
+		goto err_active_ns;
+	}
+	nvmf_ctrlr_init_active_ns(ctrlr);
+
 	ctrlr->vcprop.cap.raw = 0;
 	ctrlr->vcprop.cap.bits.cqr = 1; /* NVMe-oF specification required */
 	ctrlr->vcprop.cap.bits.mqes = transport->opts.max_queue_depth -
@@ -479,10 +480,10 @@ nvmf_ctrlr_create(struct spdk_nvmf_subsystem *subsystem,
 	return ctrlr;
 err_listener:
 	spdk_bit_array_free(&ctrlr->qpair_mask);
-err_qpair_mask:
-	free(ctrlr->active_ns);
 err_active_ns:
 	free(ctrlr);
+err_qpair_mask:
+	free(ctrlr->active_ns);
 	return NULL;
 }
 
@@ -514,6 +515,7 @@ _nvmf_ctrlr_destruct(void *ctx)
 		STAILQ_REMOVE(&ctrlr->async_events, event, spdk_nvmf_async_event_completion, link);
 		free(event);
 	}
+	free(ctrlr->active_ns);
 	free(ctrlr);
 }
 

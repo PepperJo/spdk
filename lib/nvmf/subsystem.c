@@ -812,11 +812,15 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	struct spdk_nvmf_ns *ns;
 	struct spdk_nvmf_ctrlr *ctrlr;
 
+	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
+	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
+		assert(false);
+		return -1;
+	}
+
 	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
 		return -EINVAL;
 	}
-
-	pthread_mutex_lock(&subsystem->mutex);
 
 	if (nsid == 0 || nsid > subsystem->max_nsid) {
 		return -EINVAL;
@@ -839,19 +843,16 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 				}
 			}
 		}
-		pthread_mutex_unlock(&subsystem->mutex);
 		return 0;
 	}
 
 	if (spdk_nvmf_ns_find_host(ns, hostnqn)) {
 		/* This ns already attaches the specified host. */
-		pthread_mutex_unlock(&subsystem->mutex);
 		return 0;
 	}
 
 	host = calloc(1, sizeof(*host));
 	if (!host) {
-		pthread_mutex_unlock(&subsystem->mutex);
 		return -ENOMEM;
 	}
 
@@ -868,9 +869,14 @@ spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 		}
 	}
 
-	pthread_mutex_unlock(&subsystem->mutex);
-
 	return 0;
+}
+
+static void
+nvmf_ns_remove_host(struct spdk_nvmf_ns *ns, struct spdk_nvmf_host *host)
+{
+	TAILQ_REMOVE(&ns->hosts, host, link);
+	free(host);
 }
 
 int
@@ -880,11 +886,15 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	struct spdk_nvmf_ns *ns;
 	struct spdk_nvmf_ctrlr *ctrlr;
 
+	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
+	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
+		assert(false);
+		return -1;
+	}
+
 	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
 		return -EINVAL;
 	}
-
-	pthread_mutex_lock(&subsystem->mutex);
 
 	if (nsid == 0 || nsid > subsystem->max_nsid) {
 		return -EINVAL;
@@ -911,12 +921,10 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 	host = spdk_nvmf_ns_find_host(ns, hostnqn);
 	if (host == NULL) {
 		/* This ns already does not attach the specified host */
-		pthread_mutex_unlock(&subsystem->mutex);
 		return -ENOENT;
 	}
 
-	TAILQ_REMOVE(&ns->hosts, host, link);
-	free(host);
+	nvmf_ns_remove_host(ns, host);
 
 	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
 		if (strcmp(hostnqn, ctrlr->hostnqn) == 0 && 
@@ -926,8 +934,6 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 			nvmf_ctrlr_ns_changed(ctrlr, nsid);
 		}
 	}
-
-	pthread_mutex_unlock(&subsystem->mutex);
 
 	return 0;
 }
@@ -1429,6 +1435,10 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 
 	subsystem->ana_group[ns->anagrpid - 1]--;
 
+	TAILQ_FOREACH_SAFE(host, &ns->hosts, link, tmp) {
+		nvmf_ns_remove_host(ns, host);
+	}
+
 	free(ns->ptpl_file);
 	nvmf_ns_reservation_clear_all_registrants(ns);
 	spdk_bdev_module_release_bdev(ns->bdev);
@@ -1443,6 +1453,10 @@ spdk_nvmf_subsystem_remove_ns(struct spdk_nvmf_subsystem *subsystem, uint32_t ns
 	}
 
 	nvmf_subsystem_ns_changed(subsystem, nsid);
+
+	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+		ctrlr->active_ns[nsid - 1] = false;
+	}
 
 	return 0;
 }
