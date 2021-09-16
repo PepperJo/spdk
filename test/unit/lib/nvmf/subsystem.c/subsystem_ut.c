@@ -519,7 +519,10 @@ test_spdk_nvmf_ns_attachment(void)
 		.ns = NULL,
 		.ctrlrs = NULL,
 	};
-	struct spdk_nvmf_ns ns {
+	struct spdk_nvmf_ns nsA {
+		.attach_any_ctrlr = false,
+	};
+	struct spdk_nvmf_ns nsB {
 		.attach_any_ctrlr = false,
 	};
 	struct spdk_nvmf_ctrlr ctrlrA = {
@@ -535,8 +538,9 @@ test_spdk_nvmf_ns_attachment(void)
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
 
-	/* nsid = 1 -> unallocated, nsid = 2 -> allocated */
-	subsystem.ns[1] = &ns;
+	/* nsid = 1 -> unallocated, nsid = 2,3 -> allocated */
+	subsystem.ns[1] = &nsA;
+	subsystem.ns[2] = &nsB;
 	
 	snprintf(ctrlrA.hostnqn, sizeof(ctrlrA.hostnqn), "nqn.2016-06.io.spdk:host1");
 	ctrlrA.active_ns = calloc(subsystem.max_nsid, sizeof(ctrlrA.active_ns));
@@ -558,11 +562,17 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, NULL,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == -EINVAL);
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, NULL,
+				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
+	CU_ASSERT(rc == -EINVAL);
 
 	/* Invalid nsid */
 	nsid = 0;
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
+	CU_ASSERT(rc == -EINVAL);
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == -EINVAL);
 
 	/* Unallocated ns */
@@ -570,6 +580,21 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == -ENOENT);
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
+	CU_ASSERT(rc == -ENOENT);
+
+	/* Attach any is active => do not allow individual host control */
+	nsA.attach_any_ctrlr = true;
+	nsid = 2;
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
+	CU_ASSERT(rc == -EPERM);
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
+	CU_ASSERT(rc == -EPERM);
+	nsA.attach_any_ctrlr = false;
+
 
 	/* Attach ctrlrA to namespace 2 hot + cold */
 	nsid = 2;
@@ -580,10 +605,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) != NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) != NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
@@ -599,10 +628,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) != NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) != NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
@@ -618,10 +651,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) == NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
@@ -637,10 +674,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) == NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
@@ -657,10 +698,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT, true);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) == NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
@@ -676,10 +721,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT, false);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) == NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
@@ -695,10 +744,14 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_COLD, true);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) != NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) != NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
@@ -714,16 +767,20 @@ test_spdk_nvmf_ns_attachment(void)
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_COLD, false);
 	CU_ASSERT(rc == 0);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrA->hostnqn) == NULL);
-	CU_ASSERT(spdk_nvmf_ns_find_host(&ns, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrB->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(spdk_nvmf_ns_find_host(&nsB, ctrlrB->hostnqn) == NULL);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
 	// check last ns_changed
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
 	// check async_event
 	CU_ASSERT(g_async_event_ctrlr == NULL);
-	CU_ASSERT(g_async_event == NULL);   
+	CU_ASSERT(g_async_event == NULL); 
 
 	free(ctrlrA.active_ns);
 	free(ctrlrB.active_ns);
