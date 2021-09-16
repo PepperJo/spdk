@@ -489,31 +489,30 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsys
 
 struct spdk_nvmf_host *spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn);
 
-/**
- * Attach controller of host to namespace.
- *
- * May only be performed on subsystems in the PAUSED or INACTIVE states.
- *
- * \param subsystem Subsystem the namespace belong to.
- * \param nsid Namespace ID to be removed.
- * \param hostnqn The NQN for the host.
- *
- * \return 0 on success, or negated errno value on failure.
- */
-int spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+enum spdk_nvmf_ns_attachment_type {
+	SPDK_NVMF_NS_ATTACHMENT_HOT = 0x1,
+	SPDK_NVMF_NS_ATTACHMENT_COLD = 0x2,
+	SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD = 0x3
+};
 
 /**
- * Detach controller of host from namespace
+ * Attach/Detach controller of host to/from namespace.
  *
  * May only be performed on subsystems in the PAUSED or INACTIVE states.
  *
  * \param subsystem Subsystem the namespace belong to.
  * \param nsid Namespace ID to be removed.
  * \param hostnqn The NQN for the host.
+ * \param type if host should be hot, cold or both attached/detached
+ * \param attach if true attach else detach
  *
  * \return 0 on success, or negated errno value on failure.
  */
-int spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn);
+int spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
+		      	    uint32_t nsid,
+			    const char *hostnqn,
+			    enum spdk_nvmf_ns_attachment_type type,
+			    bool attach);
 
 /**
  * Allow the given host NQN to connect to the given subsystem.

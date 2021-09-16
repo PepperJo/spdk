@@ -1461,6 +1461,8 @@ struct nvmf_rpc_ns_attachment_ctx {
 	uint32_t nsid;
 	char *host;
 	char* tgt_name;
+	bool hot;
+	bool cold;
 	bool attach;
 	bool response_sent;
 };
@@ -1468,8 +1470,10 @@ struct nvmf_rpc_ns_attachment_ctx {
 static const struct spdk_json_object_decoder nvmf_rpc_ns_attachment_decoder[] = {
 	{"nqn", offsetof(struct nvmf_rpc_ns_attachment_ctx, nqn), spdk_json_decode_string},
 	{"nsid", offsetof(struct nvmf_rpc_ns_attachment_ctx, nsid), spdk_json_decode_uint32},
-	{"host", offsetof(struct nvmf_rpc_ns_attachment_ctx, host), spdk_json_decode_string, true},
+	{"host", offsetof(struct nvmf_rpc_ns_attachment_ctx, host), spdk_json_decode_string},
 	{"tgt_name", offsetof(struct nvmf_rpc_ns_attachment_ctx, tgt_name), spdk_json_decode_string, true},
+	{"hot", offsetof(struct nvmf_rpc_ns_attachment_ctx, hot), spdk_json_decode_bool, true},
+	{"cold", offsetof(struct nvmf_rpc_ns_attachment_ctx, hot), spdk_json_decode_bool, true}
 };
 
 static void
@@ -1503,13 +1507,19 @@ nvmf_rpc_ns_attachment_paused(struct spdk_nvmf_subsystem *subsystem,
 			  void *cb_arg, int status)
 {
 	struct nvmf_rpc_ns_attachment_ctx *ctx = cb_arg;
+	enum spdk_nvmf_ns_attachment_type type;
 	int ret;
 
-	if (ctx->attach) {
-		ret = spdk_nvmf_ns_attach_ctrlr(subsystem, ctx->nsid, ctx->host);
+	if (ctx->hot == ctx->cold) {
+		/* if hot and cold are not specified both are false => default both */
+		type = SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD;
+	} else if (ctx->hot) {
+		type = SPDK_NVMF_NS_ATTACHMENT_HOT;
 	} else {
-		ret = spdk_nvmf_ns_detach_ctrlr(subsystem, ctx->nsid, ctx->host);
+		type = SPDK_NVMF_NS_ATTACHMENT_COLD;
 	}
+
+	ret = spdk_nvmf_ns_attachment(subsystem, ctx->nsid, ctx->host, type, ctx->attach);
 	if (ret < 0) {
 		SPDK_ERRLOG("Unable to attach/detach %s to namespace ID %u\n", ctx->host, ctx->nsid);
 		spdk_jsonrpc_send_error_response(ctx->request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
@@ -1550,7 +1560,6 @@ nvmf_rpc_ns_attachment(struct spdk_jsonrpc_request *request,
 		nvmf_rpc_ns_attachment_ctx_free(ctx);
 		return;
 	}
-
 	ctx->request = request;
 
 	tgt = spdk_nvmf_get_tgt(ctx->tgt_name);

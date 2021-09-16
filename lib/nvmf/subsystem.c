@@ -805,73 +805,6 @@ spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
 	return NULL;
 }
 
-int
-spdk_nvmf_ns_attach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
-{
-	struct spdk_nvmf_host *host;
-	struct spdk_nvmf_ns *ns;
-	struct spdk_nvmf_ctrlr *ctrlr;
-
-	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
-	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
-		assert(false);
-		return -1;
-	}
-
-	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
-		return -EINVAL;
-	}
-
-	if (nsid == 0 || nsid > subsystem->max_nsid) {
-		return -EINVAL;
-	}
-
-	ns = subsystem->ns[nsid - 1];
-	if (!ns) {
-		return -ENOENT;
-	}
-
-	if (hostnqn == NULL) {
-		/* Attach any ctrlr to this namespace */
-		if (!ns->attach_any_ctrlr) {
-			ns->attach_any_ctrlr = true;
-			TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-				if (!ctrlr->active_ns[nsid - 1]) {
-					ctrlr->active_ns[nsid - 1] = true;
-					nvmf_ctrlr_async_event_ns_notice(ctrlr);
-					nvmf_ctrlr_ns_changed(ctrlr, nsid);
-				}
-			}
-		}
-		return 0;
-	}
-
-	if (spdk_nvmf_ns_find_host(ns, hostnqn)) {
-		/* This ns already attaches the specified host. */
-		return 0;
-	}
-
-	host = calloc(1, sizeof(*host));
-	if (!host) {
-		return -ENOMEM;
-	}
-
-	snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
-
-	TAILQ_INSERT_HEAD(&ns->hosts, host, link);
-
-	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		if (strcmp(hostnqn, ctrlr->hostnqn) == 0 &&
-		    !ctrlr->active_ns[nsid - 1]) {
-			ctrlr->active_ns[nsid - 1] = true;
-			nvmf_ctrlr_async_event_ns_notice(ctrlr);
-			nvmf_ctrlr_ns_changed(ctrlr, nsid);
-		}
-	}
-
-	return 0;
-}
-
 static void
 nvmf_ns_remove_host(struct spdk_nvmf_ns *ns, struct spdk_nvmf_host *host)
 {
@@ -880,11 +813,15 @@ nvmf_ns_remove_host(struct spdk_nvmf_ns *ns, struct spdk_nvmf_host *host)
 }
 
 int
-spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, const char *hostnqn)
+spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
+			uint32_t nsid,
+			const char *hostnqn,
+			enum spdk_nvmf_ns_attachment_type type,
+			bool attach)
 {
-	struct spdk_nvmf_host *host;
 	struct spdk_nvmf_ns *ns;
 	struct spdk_nvmf_ctrlr *ctrlr;
+	struct spdk_nvmf_host *host;
 
 	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
 	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
@@ -892,7 +829,7 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 		return -1;
 	}
 
-	if (hostnqn != NULL && !nvmf_valid_nqn(hostnqn)) {
+	if (hostnqn == NULL || !nvmf_valid_nqn(hostnqn)) {
 		return -EINVAL;
 	}
 
@@ -905,33 +842,33 @@ spdk_nvmf_ns_detach_ctrlr(struct spdk_nvmf_subsystem *subsystem, uint32_t nsid, 
 		return -ENOENT;
 	}
 
-	if (hostnqn == NULL) {
-		/* Do not attach any ctrlr to this namespace per default */
-		ns->attach_any_ctrlr = false;
+	if (ns->attach_any_ctrlr) {
+		/* No individual host control */
+		return -EPERM;
+	}
+
+	if (type & SPDK_NVMF_NS_ATTACHMENT_COLD) {
+		host = spdk_nvmf_ns_find_host(ns, hostnqn);
+		if (attach && host == NULL) {
+			host = calloc(1, sizeof(*host));
+			if (!host) {
+				return -ENOMEM;
+			}
+			snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
+			TAILQ_INSERT_HEAD(&ns->hosts, host, link);
+		else if (!attach && host != NULL) {
+			nvmf_ns_remove_host(ns, host);
+		}
+	}
+	
+	if (type & SPDK_NVMF_NS_ATTACHMENT_HOT) {
 		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-			if (ctrlr->active_ns[nsid - 1]) {
-				ctrlr->active_ns[nsid - 1] = false;
+			if (strcmp(hostnqn, ctrlr->hostnqn) == 0 &&
+			    ctrlr->active_ns[nsid - 1] != attach) {
+				ctrlr->active_ns[nsid - 1] = attach;
 				nvmf_ctrlr_async_event_ns_notice(ctrlr);
 				nvmf_ctrlr_ns_changed(ctrlr, nsid);
 			}
-		}
-		return 0;
-	}
-
-	host = spdk_nvmf_ns_find_host(ns, hostnqn);
-	if (host == NULL) {
-		/* This ns already does not attach the specified host */
-		return -ENOENT;
-	}
-
-	nvmf_ns_remove_host(ns, host);
-
-	TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-		if (strcmp(hostnqn, ctrlr->hostnqn) == 0 && 
-		    ctrlr->active_ns[nsid - 1]) {
-			ctrlr->active_ns[nsid - 1] = false;
-			nvmf_ctrlr_async_event_ns_notice(ctrlr);
-			nvmf_ctrlr_ns_changed(ctrlr, nsid);
 		}
 	}
 
