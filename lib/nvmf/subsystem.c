@@ -856,7 +856,7 @@ spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
 			}
 			snprintf(host->nqn, sizeof(host->nqn), "%s", hostnqn);
 			TAILQ_INSERT_HEAD(&ns->hosts, host, link);
-		else if (!attach && host != NULL) {
+		} else if (!attach && host != NULL) {
 			nvmf_ns_remove_host(ns, host);
 		}
 	}
