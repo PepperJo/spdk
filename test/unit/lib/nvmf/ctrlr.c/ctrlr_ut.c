@@ -2783,6 +2783,7 @@ test_nvmf_ctrlr_ns_attachment(void)
 	SPDK_CU_ASSERT_FATAL(ctrlrB.active_ns != NULL);
 
 	/* Do not auto attach and no cold attach of any ctrlr */
+	nsid = 2;
 	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
 	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA.hostnqn) == NULL);
 	nvmf_ctrlr_init_active_ns(&ctrlrA);
