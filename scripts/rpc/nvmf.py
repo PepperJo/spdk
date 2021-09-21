@@ -350,7 +350,7 @@ def nvmf_subsystem_add_ns(client,
                           eui64=None,
                           uuid=None,
                           anagrpid=None,
-                          no_auto_attach=None):
+                          no_auto_attach=False):
     """Add a namespace to a subsystem.
 
     Args:
@@ -383,7 +383,8 @@ def nvmf_subsystem_add_ns(client,
     if uuid:
         ns['uuid'] = uuid
     
-    ns['no_auto_attach'] = True if no_auto_attach else False
+    if no_auto_attach:
+        ns['no_auto_attach'] = no_auto_attach
 
     if anagrpid:
         ns['anagrpid'] = anagrpid
@@ -416,52 +417,37 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
 
     return client.call('nvmf_subsystem_remove_ns', params)
 
-def nvmf_ns_attach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
-    """Attach controller of host to namespace
+def nvmf_ns_attachment(attach, client, nqn, nsid, host, hot=False, cold=False, tgt_name=None):
+    """Attach/Detach controller of host to namespace
 
     Args:
         nqn: Subsystem NQN.
         nsid: Namespace ID.
-        host: Host NQN to attach (optional).
+        host: Host NQN to attach
+        hot: hot attach/detach controller
+        cold: cold attach/detach controller
         tgt_name: name of the parent NVMe-oF target (optional).
 
     Returns:
         True or False
     """
     params = {'nqn': nqn,
-              'nsid': nsid}
+              'nsid': nsid,
+              'host': host}
 
-    if host:
-        params['host'] = host
+    if hot:
+        params['hot'] = hot
 
-    if tgt_name:
-        params['tgt_name'] = tgt_name
-
-    return client.call('nvmf_ns_attach_ctrlr', params)
-
-def nvmf_ns_detach_ctrlr(client, nqn, nsid, host=None, tgt_name=None):
-    """Detach controller of host from namespace
-
-    Args:
-        nqn: Subsystem NQN.
-        nsid: Namespace ID.
-        host: Host NQN to detach (optional).
-        tgt_name: name of the parent NVMe-oF target (optional).
-
-    Returns:
-        True or False
-    """
-    params = {'nqn': nqn,
-              'nsid': nsid}
-
-    if host:
-        params['host'] = host
+    if cold:
+        params['cold'] = cold
 
     if tgt_name:
         params['tgt_name'] = tgt_name
 
-    return client.call('nvmf_ns_detach_ctrlr', params)
-
+    if attach:
+        return client.call('nvmf_ns_attach_ctrlr', params)
+    else:
+        return client.call('nvmf_ns_detach_ctrlr', params)
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
     """Add a host NQN to the list of allowed hosts.

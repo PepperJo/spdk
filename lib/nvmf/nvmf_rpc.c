@@ -1471,9 +1471,9 @@ static const struct spdk_json_object_decoder nvmf_rpc_ns_attachment_decoder[] = 
 	{"nqn", offsetof(struct nvmf_rpc_ns_attachment_ctx, nqn), spdk_json_decode_string},
 	{"nsid", offsetof(struct nvmf_rpc_ns_attachment_ctx, nsid), spdk_json_decode_uint32},
 	{"host", offsetof(struct nvmf_rpc_ns_attachment_ctx, host), spdk_json_decode_string},
-	{"tgt_name", offsetof(struct nvmf_rpc_ns_attachment_ctx, tgt_name), spdk_json_decode_string, true},
 	{"hot", offsetof(struct nvmf_rpc_ns_attachment_ctx, hot), spdk_json_decode_bool, true},
-	{"cold", offsetof(struct nvmf_rpc_ns_attachment_ctx, hot), spdk_json_decode_bool, true}
+	{"cold", offsetof(struct nvmf_rpc_ns_attachment_ctx, cold), spdk_json_decode_bool, true},
+	{"tgt_name", offsetof(struct nvmf_rpc_ns_attachment_ctx, tgt_name), spdk_json_decode_string, true},
 };
 
 static void
