@@ -2765,10 +2765,8 @@ test_nvmf_ctrlr_ns_attachment(void)
 	struct spdk_nvmf_ctrlr ctrlrB = {
 		.subsys = &subsystem
 	};
-	struct spdk_nvmf_ns_opts ns_opts;
 	struct spdk_nvmf_host *host;
 	uint32_t nsid;
-	int rc;
 
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
@@ -2798,10 +2796,8 @@ test_nvmf_ctrlr_ns_attachment(void)
 	/* Cold attach ctrlrA to namespace 2 */
 	nsid = 2;
 	host = calloc(1, sizeof(*host));
-	if (!host) {
-		return -ENOMEM;
-	}
-	snprintf(host->nqn, sizeof(host->nqn), "%s", ctrlrA->hostnqn);
+	SPDK_CU_ASSERT_FATAL(host != NULL);
+	snprintf(host->nqn, sizeof(host->nqn), "%s", ctrlrA.hostnqn);
 	TAILQ_INSERT_HEAD(&nsA.hosts, host, link);
 	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == host);
 	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA.hostnqn) == NULL);
