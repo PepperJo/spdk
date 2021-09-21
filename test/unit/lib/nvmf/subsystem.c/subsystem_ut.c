@@ -512,11 +512,7 @@ test_spdk_nvmf_subsystem_set_sn(void)
 static void
 test_spdk_nvmf_ns_attachment(void)
 {
-	struct spdk_nvmf_subsystem subsystem = {
-		.max_nsid = 1024,
-		.ns = NULL,
-		.ctrlrs = NULL
-	};
+	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns nsA = {
 		.attach_any_ctrlr = false
 	};
@@ -533,6 +529,7 @@ test_spdk_nvmf_ns_attachment(void)
 	uint32_t nsid;
 	int rc;
 
+	subsystem.max_nsid = 1024;
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
 
