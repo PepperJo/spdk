@@ -2731,6 +2731,117 @@ test_nvmf_property_set(void)
 	CU_ASSERT(req.rsp->prop_get_rsp.value.u64 == 0xDDADBEEF);
 }
 
+static struct spdk_nvmf_host * 
+nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+{
+	struct spdk_nvmf_host *host = NULL;
+
+	TAILQ_FOREACH(host, &ns->hosts, link) {
+		if (strcmp(hostnqn, host->nqn) == 0) {
+			return host;
+		}
+	}
+
+	return NULL;
+}
+
+static void
+test_nvmf_ctrlr_ns_attachment(void)
+{
+	struct spdk_nvmf_subsystem subsystem = {
+		.max_nsid = 1024,
+		.ns = NULL,
+		.ctrlrs = NULL,
+	};
+	struct spdk_nvmf_ns nsA {
+		.attach_any_ctrlr = false,
+	};
+	struct spdk_nvmf_ns nsB {
+		.attach_any_ctrlr = false,
+	};
+	struct spdk_nvmf_ctrlr ctrlrA = {
+		.subsys = &subsystem,
+	};
+	struct spdk_nvmf_ctrlr ctrlrB = {
+		.subsys = &subsystem,
+	};
+	struct spdk_nvmf_ns_opts ns_opts;
+	struct spdk_nvmf_host *host;
+	uint32_t nsid;
+	int rc;
+
+	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
+	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
+
+	/* nsid = 1 -> unallocated, nsid = 2,3 -> allocated */
+	subsystem.ns[1] = &nsA;
+	subsystem.ns[2] = &nsB;
+
+	snprintf(ctrlrA.hostnqn, sizeof(ctrlrA.hostnqn), "nqn.2016-06.io.spdk:host1");
+	ctrlrA.active_ns = calloc(subsystem.max_nsid, sizeof(ctrlrA.active_ns));
+	SPDK_CU_ASSERT_FATAL(ctrlrA.active_ns != NULL);
+	snprintf(ctrlrB.hostnqn, sizeof(ctrlrB.hostnqn), "nqn.2016-06.io.spdk:host2");
+	ctrlrB.active_ns = calloc(subsystem.max_nsid, sizeof(ctrlrB.active_ns));
+	SPDK_CU_ASSERT_FATAL(ctrlrB.active_ns != NULL);
+
+	/* Do not auto attach and no cold attach of any ctrlr */
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+
+	/* Cold attach ctrlrA to namespace 2 */
+	nsid = 2;
+	host = calloc(1, sizeof(*host));
+	if (!host) {
+		return -ENOMEM;
+	}
+	snprintf(host->nqn, sizeof(host->nqn), "%s", ctrlrA->hostnqn);
+	TAILQ_INSERT_HEAD(&nsA.hosts, host, link);
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == host);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == host);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+
+	/* Detach */
+	ctrlrA.active_ns[nsid - 1] = false;
+	TAILQ_REMOVE(&nsA.hosts, host, link);
+	free(host);
+
+	/* Auto attach any ctrlr to namespace 2 */
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
+	nsA.attach_any_ctrlr = true;
+	nvmf_ctrlr_init_active_ns(&ctrlrA);
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+	nvmf_ctrlr_init_active_ns(&ctrlrB);
+	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
+	CU_ASSERT(ctrlrB.active_ns[nsid - 1]);
+	CU_ASSERT(!ctrlrA.active_ns[nsid]]);
+	CU_ASSERT(!ctrlrB.active_ns[nsid]]);
+	CU_ASSERT(nvmf_ns_find_host(&nsA, ctrlrA->hostnqn) == NULL);
+	CU_ASSERT(nvmf_ns_find_host(&nsB, ctrlrA->hostnqn) == NULL);
+}
+
 int main(int argc, char **argv)
 {
 	CU_pSuite	suite = NULL;
@@ -2766,6 +2877,7 @@ int main(int argc, char **argv)
 	CU_ADD_TEST(suite, test_zcopy_read);
 	CU_ADD_TEST(suite, test_zcopy_write);
 	CU_ADD_TEST(suite, test_nvmf_property_set);
+	CU_ADD_TEST(suite, test_nvmf_ctrlr_ns_attachment);
 
 	allocate_threads(1);
 	set_thread(0);
