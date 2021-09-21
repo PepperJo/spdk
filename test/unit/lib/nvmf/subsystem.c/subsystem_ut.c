@@ -629,7 +629,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) != NULL);
@@ -652,7 +652,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
@@ -675,7 +675,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
@@ -699,7 +699,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT, true);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
@@ -722,7 +722,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT, false);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
@@ -745,7 +745,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_COLD, true);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) != NULL);
@@ -768,7 +768,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_COLD, false);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(&nsA, ctrlrA.hostnqn) == NULL);
@@ -792,7 +792,7 @@ test_spdk_nvmf_ns_attachment(void)
 	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(spdk_nvmf_ns_find_host(nsC, ctrlrA.hostnqn) != NULL);
