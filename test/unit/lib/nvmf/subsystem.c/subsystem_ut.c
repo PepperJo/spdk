@@ -572,29 +572,29 @@ test_spdk_nvmf_ns_attachment(void)
 
 	/* Invalid nsid */
 	nsid = 0;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == -EINVAL);
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == -EINVAL);
 
 	/* Unallocated ns */
 	nsid = 1;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == -ENOENT);
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == -ENOENT);
 
 	/* Attach any is active => do not allow individual host control */
 	nsA.attach_any_ctrlr = true;
 	nsid = 2;
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, true);
 	CU_ASSERT(rc == -EPERM);
-	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
+	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA.hostnqn,
 				     SPDK_NVMF_NS_ATTACHMENT_HOT_AND_COLD, false);
 	CU_ASSERT(rc == -EPERM);
 	nsA.attach_any_ctrlr = false;
@@ -765,7 +765,7 @@ test_spdk_nvmf_ns_attachment(void)
 
 	/* Detach ctrlrA from namespace 2 cold */
 	g_async_event_ctrlr = NULL;
-	g_async_event = NULL
+	g_async_event = NULL;
 	g_ns_changed_ctrlr = NULL;
 	g_ns_changed_nsid = 0;
 	rc = spdk_nvmf_ns_attachment(&subsystem, nsid, ctrlrA->hostnqn,
