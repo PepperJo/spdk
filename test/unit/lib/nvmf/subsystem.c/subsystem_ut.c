@@ -681,8 +681,6 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(g_ns_changed_nsid == 0);
 	// check async_event
 	CU_ASSERT(g_async_event_ctrlr == NULL);
-	CU_ASSERT(g_async_event == NULL);
-
 
 	/* Attach ctrlrA to namespace 2 hot */
 	g_async_event_ctrlr = NULL;

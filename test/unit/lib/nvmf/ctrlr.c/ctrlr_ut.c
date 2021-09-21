@@ -2748,11 +2748,7 @@ nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
 static void
 test_nvmf_ctrlr_ns_attachment(void)
 {
-	struct spdk_nvmf_subsystem subsystem = {
-		.max_nsid = 1024,
-		.ns = NULL,
-		.ctrlrs = NULL
-	};
+	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns nsA = {
 		.attach_any_ctrlr = false
 	};
@@ -2768,6 +2764,7 @@ test_nvmf_ctrlr_ns_attachment(void)
 	struct spdk_nvmf_host *host;
 	uint32_t nsid;
 
+	subsystem.max_nsid = 1024;
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
 
