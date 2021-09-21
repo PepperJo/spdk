@@ -242,12 +242,13 @@ nvmf_ctrlr_ns_changed(struct spdk_nvmf_ctrlr *ctrlr, uint32_t nsid)
 
 static struct spdk_nvmf_ctrlr *g_async_event_ctrlr = NULL;
 static union spdk_nvme_async_event_completion *g_async_event = NULL;
-int
+static int
 nvmf_ctrlr_async_event_notification(struct spdk_nvmf_ctrlr *ctrlr,
 				    union spdk_nvme_async_event_completion *event)
 {
 	g_async_event_ctrlr = ctrlr;
 	g_async_event = event;
+	return 0;
 }
 
 static struct spdk_bdev g_bdevs[] = {
