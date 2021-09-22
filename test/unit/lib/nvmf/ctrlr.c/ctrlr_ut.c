@@ -854,6 +854,7 @@ test_get_ns_id_desc_list(void)
 	struct spdk_nvmf_request req;
 	struct spdk_nvmf_ns *ns_ptrs[1];
 	struct spdk_nvmf_ns ns;
+	bool active_ns[1];
 	union nvmf_h2c_msg cmd;
 	union nvmf_c2h_msg rsp;
 	struct spdk_bdev bdev;
@@ -875,6 +876,7 @@ test_get_ns_id_desc_list(void)
 	memset(&ctrlr, 0, sizeof(ctrlr));
 	ctrlr.subsys = &subsystem;
 	ctrlr.vcprop.cc.bits.en = 1;
+	ctrlr.active_ns = active_ns;
 
 	memset(&req, 0, sizeof(req));
 	req.qpair = &qpair;
@@ -895,7 +897,16 @@ test_get_ns_id_desc_list(void)
 	CU_ASSERT(rsp.nvme_cpl.status.sct == SPDK_NVME_SCT_GENERIC);
 	CU_ASSERT(rsp.nvme_cpl.status.sc == SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT);
 
+	/* Valid NSID, but ns is inactive */
+	active_ns[0] = false;
+	cmd.nvme_cmd.nsid = 1;
+	memset(&rsp, 0, sizeof(rsp));
+	CU_ASSERT(nvmf_ctrlr_process_admin_cmd(&req) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
+	CU_ASSERT(rsp.nvme_cpl.status.sct == SPDK_NVME_SCT_GENERIC);
+	CU_ASSERT(rsp.nvme_cpl.status.sc == SPDK_NVME_SC_INVALID_NAMESPACE_OR_FORMAT);
+
 	/* Valid NSID, but ns has no IDs defined */
+	active_ns[0] = true;
 	cmd.nvme_cmd.nsid = 1;
 	memset(&rsp, 0, sizeof(rsp));
 	CU_ASSERT(nvmf_ctrlr_process_admin_cmd(&req) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
@@ -2748,11 +2759,7 @@ nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
 static void
 test_nvmf_ctrlr_ns_attachment(void)
 {
-	struct spdk_nvmf_subsystem subsystem = {
-		.max_nsid = 1024,
-		.ns = NULL,
-		.ctrlrs = NULL
-	};
+	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns nsA = {
 		.attach_any_ctrlr = false
 	};
@@ -2768,6 +2775,7 @@ test_nvmf_ctrlr_ns_attachment(void)
 	struct spdk_nvmf_host *host;
 	uint32_t nsid;
 
+	subsystem.max_nsid = 1024;
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
 
