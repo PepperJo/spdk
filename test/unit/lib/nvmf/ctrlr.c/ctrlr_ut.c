@@ -407,8 +407,7 @@ test_connect(void)
 	struct spdk_nvmf_transport transport;
 	struct spdk_nvmf_transport_ops tops = {};
 	struct spdk_nvmf_subsystem subsystem;
-	struct spdk_nvmf_ns ns;
-	struct spdk_nvmf_ns ns_arr[1];
+	struct spdk_nvmf_ns *ns_arr[1] = { NULL };
 	struct spdk_nvmf_request req;
 	struct spdk_nvmf_qpair admin_qpair;
 	struct spdk_nvmf_qpair qpair;
