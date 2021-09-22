@@ -1530,12 +1530,14 @@ test_get_dif_ctx(void)
 	struct spdk_nvmf_ctrlr ctrlr = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *_ns = NULL;
+	bool active_ns[1] = { true };
 	struct spdk_bdev bdev = {};
 	union nvmf_h2c_msg cmd = {};
 	struct spdk_dif_ctx dif_ctx = {};
 	bool ret;
 
 	ctrlr.subsys = &subsystem;
+	ctrlr.active_ns = active_ns;
 
 	qpair.ctrlr = &ctrlr;
 
