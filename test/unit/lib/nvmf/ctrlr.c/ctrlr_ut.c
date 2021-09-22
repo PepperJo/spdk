@@ -1710,6 +1710,7 @@ test_fused_compare_and_write(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = {};
@@ -1733,6 +1734,7 @@ test_fused_compare_and_write(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.num_sgroups = 1;
 	sgroups.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
