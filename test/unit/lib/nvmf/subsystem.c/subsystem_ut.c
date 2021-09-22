@@ -532,6 +532,8 @@ test_spdk_nvmf_ns_attachment(void)
 	subsystem.max_nsid = 1024;
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
+	subsystem.ana_group = calloc(subsystem.max_nsid, sizeof(uint32_t));
+	SPDK_CU_ASSERT_FATAL(subsystem.ana_group != NULL);
 
 	subsystem.ns[1] = &ns1;
 	subsystem.ns[2] = &ns2;
