@@ -992,7 +992,12 @@ test_identify_ns(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_transport transport = {};
 	struct spdk_nvmf_qpair admin_qpair = { .transport = &transport};
-	struct spdk_nvmf_ctrlr ctrlr = { .subsys = &subsystem, .admin_qpair = &admin_qpair };
+	bool active_ns[3] = {true, false, true};
+	struct spdk_nvmf_ctrlr ctrlr = { 
+		.subsys = &subsystem,
+		.admin_qpair = &admin_qpair,
+		.active_ns = active_ns 
+	};
 	struct spdk_nvme_cmd cmd = {};
 	struct spdk_nvme_cpl rsp = {};
 	struct spdk_nvme_ns_data nsdata = {};
@@ -1023,7 +1028,18 @@ test_identify_ns(void)
 	CU_ASSERT(rsp.status.sc == SPDK_NVME_SC_SUCCESS);
 	CU_ASSERT(nsdata.nsze == 1234);
 
-	/* Valid but inactive NSID 2 */
+	/* Valid but inactive NSID 1 */
+	active_ns[0] = false;
+	cmd.nsid = 1;
+	memset(&nsdata, 0, sizeof(nsdata));
+	memset(&rsp, 0, sizeof(rsp));
+	CU_ASSERT(spdk_nvmf_ctrlr_identify_ns(&ctrlr, &cmd, &rsp,
+					      &nsdata) == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
+	CU_ASSERT(rsp.status.sct == SPDK_NVME_SCT_GENERIC);
+	CU_ASSERT(rsp.status.sc == SPDK_NVME_SC_SUCCESS);
+	CU_ASSERT(spdk_mem_all_zero(&nsdata, sizeof(nsdata)));
+
+	/* Valid but unallocated NSID 2 */
 	cmd.nsid = 2;
 	memset(&nsdata, 0, sizeof(nsdata));
 	memset(&rsp, 0, sizeof(rsp));
