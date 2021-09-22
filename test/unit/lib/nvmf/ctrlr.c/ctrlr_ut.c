@@ -122,11 +122,6 @@ DEFINE_STUB(nvmf_subsystem_find_listener,
 	     const struct spdk_nvme_transport_id *trid),
 	    (void *)0x1);
 
-DEFINE_STUB(spdk_nvmf_ns_find_host,
-	    struct spdk_nvmf_host *,
-	    (struct spdk_nvmf_ns *ns, const char *hostnqn),
-	    NULL);
-
 DEFINE_STUB(nvmf_bdev_ctrlr_read_cmd,
 	    int,
 	    (struct spdk_bdev *bdev, struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
@@ -2779,8 +2774,8 @@ test_nvmf_property_set(void)
 	CU_ASSERT(req.rsp->prop_get_rsp.value.u64 == 0xDDADBEEF);
 }
 
-static struct spdk_nvmf_host * 
-nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
+struct spdk_nvmf_host * 
+spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn)
 {
 	struct spdk_nvmf_host *host = NULL;
 
