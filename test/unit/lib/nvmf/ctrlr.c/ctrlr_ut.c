@@ -2551,6 +2551,7 @@ test_zcopy_read(void)
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	enum spdk_nvme_ana_state ana_state[1];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
 	struct spdk_bdev bdev = { .blockcnt = 100, .blocklen = 512};
@@ -2575,6 +2576,7 @@ test_zcopy_read(void)
 	ctrlr.vcprop.cc.bits.en = 1;
 	ctrlr.subsys = (struct spdk_nvmf_subsystem *)&subsystem;
 	ctrlr.listener = &listener;
+	ctrlr.active_ns = active_ns;
 
 	group.thread = spdk_get_thread();
 	group.num_sgroups = 1;
