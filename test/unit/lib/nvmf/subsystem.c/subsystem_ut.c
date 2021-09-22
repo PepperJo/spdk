@@ -514,9 +514,13 @@ test_spdk_nvmf_ns_attachment(void)
 {
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns1 = {
+		.nsid = 1,
+		.anagrpid = 1,
 		.attach_any_ctrlr = false
 	};
 	struct spdk_nvmf_ns ns2 = {
+		.nsid = 2,
+		.anagrpid = 2,
 		.attach_any_ctrlr = false
 	};
 	struct spdk_nvmf_ns *ns3;
@@ -539,6 +543,8 @@ test_spdk_nvmf_ns_attachment(void)
 	subsystem.ns[2] = &ns2;
 	ns3 = calloc(1, sizeof(*ns3));
 	SPDK_CU_ASSERT_FATAL(ns3 != NULL);
+	ns3->nsid = 3;
+	ns3->anagrpid = 3;
 	subsystem.ns[3] = ns3;
 	
 	snprintf(ctrlrA.hostnqn, sizeof(ctrlrA.hostnqn), "nqn.2016-06.io.spdk:host1");
