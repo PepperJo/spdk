@@ -2233,6 +2233,7 @@ test_nvmf_ctrlr_create_destruct(void)
 	struct spdk_nvmf_transport transport = {};
 	struct spdk_nvmf_transport_ops tops = {};
 	struct spdk_nvmf_subsystem subsystem = {};
+	struct spdk_nvmf_ns *ns_arr[1] = { NULL };
 	struct spdk_nvmf_request req = {};
 	struct spdk_nvmf_qpair qpair = {};
 	struct spdk_nvmf_ctrlr *ctrlr = NULL;
@@ -2270,6 +2271,7 @@ test_nvmf_ctrlr_create_destruct(void)
 	subsystem.subtype = SPDK_NVMF_SUBTYPE_NVME;
 	subsystem.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
 	snprintf(subsystem.subnqn, sizeof(subsystem.subnqn), "%s", subnqn);
+	subsystem.ns = ns_arr;
 
 	group.sgroups = sgroups;
 
@@ -2340,6 +2342,7 @@ test_nvmf_ctrlr_use_zcopy(void)
 	union nvmf_h2c_msg cmd = {};
 	struct spdk_nvmf_ns ns = {};
 	struct spdk_nvmf_ns *subsys_ns[1] = {};
+	bool active_ns[1] = { true };
 	struct spdk_bdev bdev = {};
 	struct spdk_nvmf_poll_group group = {};
 	struct spdk_nvmf_subsystem_poll_group sgroups = {};
@@ -2356,6 +2359,7 @@ test_nvmf_ctrlr_use_zcopy(void)
 	subsystem.ns = (struct spdk_nvmf_ns **)&subsys_ns;
 
 	ctrlr.subsys = &subsystem;
+	ctrlr.active_ns = active_ns;
 
 	qpair.ctrlr = &ctrlr;
 	qpair.group = &group;
