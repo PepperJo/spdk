@@ -1658,8 +1658,10 @@ test_spdk_nvmf_ns_event(void)
 		.ns = NULL,
 		.tgt = &tgt,
 	};
+	bool active_ns[1] = { true };
 	struct spdk_nvmf_ctrlr ctrlr = {
-		.subsys = &subsystem
+		.subsys = &subsystem,
+		.active_ns = active_ns
 	};
 	struct spdk_nvmf_ns_opts ns_opts;
 	uint32_t nsid;
