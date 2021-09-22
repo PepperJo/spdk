@@ -2812,7 +2812,7 @@ test_nvmf_ctrlr_ns_attachment(void)
 	struct spdk_nvmf_host *host;
 	uint32_t nsid;
 
-	subsystem.max_nsid = 1024;
+	subsystem.max_nsid = 3;
 	subsystem.ns = calloc(subsystem.max_nsid, sizeof(subsystem.ns));
 	SPDK_CU_ASSERT_FATAL(subsystem.ns != NULL);
 
