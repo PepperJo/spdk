@@ -1090,8 +1090,12 @@ test_set_get_features(void)
 	struct spdk_nvmf_qpair admin_qpair = {};
 	enum spdk_nvme_ana_state ana_state[3];
 	struct spdk_nvmf_subsystem_listener listener = { .ana_state = ana_state };
+	bool active_ns[3] = { true, false, true };
 	struct spdk_nvmf_ctrlr ctrlr = {
-		.subsys = &subsystem, .admin_qpair = &admin_qpair, .listener = &listener
+		.subsys = &subsystem,
+		.admin_qpair = &admin_qpair,
+		.listener = &listener,
+		.active_ns = active_ns
 	};
 	union nvmf_h2c_msg cmd = {};
 	union nvmf_c2h_msg rsp = {};
