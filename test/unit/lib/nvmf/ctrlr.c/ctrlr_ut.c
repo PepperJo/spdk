@@ -407,6 +407,8 @@ test_connect(void)
 	struct spdk_nvmf_transport transport;
 	struct spdk_nvmf_transport_ops tops = {};
 	struct spdk_nvmf_subsystem subsystem;
+	struct spdk_nvmf_ns ns;
+	struct spdk_nvmf_ns ns_arr[1];
 	struct spdk_nvmf_request req;
 	struct spdk_nvmf_qpair admin_qpair;
 	struct spdk_nvmf_qpair qpair;
@@ -466,6 +468,8 @@ test_connect(void)
 	subsystem.subtype = SPDK_NVMF_SUBTYPE_NVME;
 	subsystem.state = SPDK_NVMF_SUBSYSTEM_ACTIVE;
 	snprintf(subsystem.subnqn, sizeof(subsystem.subnqn), "%s", subnqn);
+	subsystem.ns = ns_arr;
+	subsystem.max_nsid = 1;
 
 	sgroups = calloc(subsystem.id + 1, sizeof(struct spdk_nvmf_subsystem_poll_group));
 	group.sgroups = sgroups;
