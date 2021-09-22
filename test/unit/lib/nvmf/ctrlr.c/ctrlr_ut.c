@@ -2798,9 +2798,11 @@ test_nvmf_ctrlr_ns_attachment(void)
 {
 	struct spdk_nvmf_subsystem subsystem = {};
 	struct spdk_nvmf_ns ns1 = {
+		.nsid = 1,
 		.attach_any_ctrlr = false
 	};
 	struct spdk_nvmf_ns ns3 = {
+		.nsid = 3,
 		.attach_any_ctrlr = false
 	};
 	struct spdk_nvmf_ctrlr ctrlrA = {
