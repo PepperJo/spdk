@@ -617,10 +617,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == &ctrlrA);
 
 	/* Attach ctrlrA to namespace 2 again => should not create any ns change/async event */
@@ -638,10 +638,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == NULL);
 
 	/* Detach ctrlrA from namespace 2 hot + cold */
@@ -659,10 +659,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == &ctrlrA);
 
 	/* Detach ctrlrA from namespace 2 again hot + cold */
@@ -680,10 +680,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == NULL);
 
 	/* Attach ctrlrA to namespace 2 hot */
@@ -701,10 +701,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == &ctrlrA);
 
 	/* Detach ctrlrA from namespace 2 hot */
@@ -722,10 +722,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == &ctrlrA);
 
 	/* Attach ctrlrA to namespace 2 cold */
@@ -743,10 +743,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == NULL);
 
 	/* Detach ctrlrA from namespace 2 cold */
@@ -764,10 +764,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrA.active_ns[nsid]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == NULL);
 	CU_ASSERT(g_ns_changed_nsid == 0);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == NULL);
 
 	/* Attach ctrlrA to namespace 4 hot + cold => remove ns */
@@ -782,10 +782,10 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(spdk_nvmf_ns_find_host(ns3, ctrlrB.hostnqn) == NULL);
 	CU_ASSERT(ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
-	// check async_event
+	/* check async_event */
 	CU_ASSERT(g_async_event_ctrlr == &ctrlrA);
 
 	g_async_event_ctrlr = NULL;
@@ -795,7 +795,7 @@ test_spdk_nvmf_ns_attachment(void)
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(!ctrlrA.active_ns[nsid - 1]);
 	CU_ASSERT(!ctrlrB.active_ns[nsid - 1]);
-	// check last ns_changed
+	/* check last ns_changed */
 	CU_ASSERT(g_ns_changed_ctrlr == &ctrlrA);
 	CU_ASSERT(g_ns_changed_nsid == nsid);
 

@@ -485,8 +485,14 @@ struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_first(struct spdk_nvmf_tgt *
  */
 struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_get_next(struct spdk_nvmf_subsystem *subsystem);
 
-
-
+/**
+ * Find host of which controllers should be attached to the namespace
+ *
+ * \param ns Namespace to search in.
+ * \param hostnqn The NQN of the host.
+ *
+ * \return a pointer to the NVMe-oF host on success, or NULL if not found.
+ */
 struct spdk_nvmf_host *spdk_nvmf_ns_find_host(struct spdk_nvmf_ns *ns, const char *hostnqn);
 
 enum spdk_nvmf_ns_attachment_type {
@@ -509,7 +515,7 @@ enum spdk_nvmf_ns_attachment_type {
  * \return 0 on success, or negated errno value on failure.
  */
 int spdk_nvmf_ns_attachment(struct spdk_nvmf_subsystem *subsystem,
-		      	    uint32_t nsid,
+			    uint32_t nsid,
 			    const char *hostnqn,
 			    enum spdk_nvmf_ns_attachment_type type,
 			    bool attach);
