@@ -1638,6 +1638,7 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 	struct spdk_nvmf_transport *transport;
 	struct spdk_nvmf_ns_opts opts;
 	struct spdk_nvmf_ns *ns;
+	struct spdk_nvmf_ctrlr *ctrlr;
 	struct spdk_nvmf_reservation_info info = {0};
 	int rc;
 
@@ -1698,7 +1699,7 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 	ns->attach_any_ctrlr = !opts.no_auto_attach;
 	if (ns->attach_any_ctrlr) {
 		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
-			ctrlr->active_ns[nsid - 1] = true;
+			ctrlr->active_ns[opts.nsid - 1] = true;
 		}
 	}
 
