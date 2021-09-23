@@ -1696,6 +1696,7 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 		return 0;
 	}
 
+	TAILQ_INIT(&ns->hosts);
 	ns->attach_any_ctrlr = !opts.no_auto_attach;
 	if (ns->attach_any_ctrlr) {
 		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
