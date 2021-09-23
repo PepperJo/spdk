@@ -13,7 +13,7 @@ HOSTNQN="nqn.2016-06.io.spdk:host1"
 
 function connect() {
         nvme connect -t $TEST_TRANSPORT -n $SUBSYSNQN -q $HOSTNQN -a "$NVMF_FIRST_TARGET_IP" -s "$NVMF_PORT"
-        waitforserial "$NVMF_SERIAL"
+        waitforserial "$NVMF_SERIAL" $1
         ctrl_id=$(nvme list-subsys | sed -n "s/traddr=$NVMF_FIRST_TARGET_IP trsvcid=$NVMF_PORT//p" | sed 's/[^0-9]*//g')
 }
 
@@ -56,7 +56,7 @@ $rpc_py nvmf_subsystem_add_ns $SUBSYSNQN Malloc1 -n 1
 $rpc_py nvmf_subsystem_add_listener $SUBSYSNQN -t $TEST_TRANSPORT -a $NVMF_FIRST_TARGET_IP -s $NVMF_PORT
 
 # Namespace should be active
-connect
+connect 1
 check_active "0x1"
 
 # Add 2nd namespace and check active
@@ -72,7 +72,7 @@ $rpc_py nvmf_subsystem_remove_ns $SUBSYSNQN 1
 $rpc_py nvmf_subsystem_add_ns $SUBSYSNQN Malloc1 -n 1 --no-auto-attach
 
 # namespace should be inactive
-connect
+connect 1
 check_inactive "0x1"
 
 # hot + cold attach and check active
@@ -85,7 +85,7 @@ check_inactive "0x1"
 disconnect
 
 # connect and check active
-connect
+connect 2
 check_active "0x1"
 
 # hot + cold detach
@@ -94,7 +94,7 @@ check_inactive "0x1"
 disconnect
 
 # connect and check inactive
-connect
+connect 1
 check_inactive "0x1"
 
 # hot attach and check active
@@ -103,7 +103,7 @@ check_active "0x1"
 disconnect
 
 # connect and check inactive
-connect
+connect 1
 check_inactive "0x1"
 
 # cold attach and check inactive
@@ -112,7 +112,7 @@ check_inactive "0x1"
 disconnect
 
 # connect and check active
-connect
+connect 2
 check_active "0x1"
 
 # cold detach and check active
@@ -121,7 +121,7 @@ check_active "0x1"
 disconnect
 
 # connect and check inactive
-connect
+connect 1
 check_inactive "0x1"
 disconnect
 
