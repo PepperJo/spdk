@@ -11,6 +11,8 @@ loops=5
 SUBSYSNQN="nqn.2016-06.io.spdk:cnode1"
 HOSTNQN="nqn.2016-06.io.spdk:host1"
 
+ctrl_id=
+
 function connect() {
         nvme connect -t $TEST_TRANSPORT -n $SUBSYSNQN -q $HOSTNQN -a "$NVMF_FIRST_TARGET_IP" -s "$NVMF_PORT"
         waitforserial "$NVMF_SERIAL"
