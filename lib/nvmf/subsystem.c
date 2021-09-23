@@ -1696,6 +1696,11 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 	}
 
 	ns->attach_any_ctrlr = !opts.no_auto_attach;
+	if (ns->attach_any_ctrlr) {
+		TAILQ_FOREACH(ctrlr, &subsystem->ctrlrs, link) {
+			ctrlr->active_ns[nsid - 1] = true;
+		}
+	}
 
 	rc = spdk_bdev_open_ext(bdev_name, true, nvmf_ns_event, ns, &ns->desc);
 	if (rc != 0) {
