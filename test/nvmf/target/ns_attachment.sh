@@ -32,7 +32,7 @@ function check_active() {
 
 # $1 == hex nsid
 function check_inactive() {
-        NOT nvme list-ns /dev/nvme$ctrl_id | grep "$1"
+        NOT grep "$1" <(nvme list-ns /dev/nvme$ctrl_id)
         nguid=$(nvme id-ns /dev/nvme$ctrl_id -n $1 -o json | jq -r ".nguid")
         if [[ $nguid != "00000000000000000000000000000000" ]]; then
                 echo "Namespace with NSID $1 active." && false
