@@ -1608,6 +1608,7 @@ nvmf_ns_opts_copy(struct spdk_nvmf_ns_opts *opts,
 		memcpy(&opts->uuid, &user_opts->uuid, sizeof(opts->uuid));
 	}
 	SET_FIELD(anagrpid);
+	SET_FIELD(no_auto_attach);
 
 	opts->opts_size = user_opts->opts_size;
 
