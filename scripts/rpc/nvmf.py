@@ -339,7 +339,6 @@ def nvmf_subsystem_listener_set_ana_state(
     return client.call('nvmf_subsystem_listener_set_ana_state', params)
 
 
-
 def nvmf_subsystem_add_ns(client,
                           nqn,
                           bdev_name,
@@ -417,6 +416,7 @@ def nvmf_subsystem_remove_ns(client, nqn, nsid, tgt_name=None):
 
     return client.call('nvmf_subsystem_remove_ns', params)
 
+
 def nvmf_ns_attachment(attach, client, nqn, nsid, host, hot=False, cold=False, tgt_name=None):
     """Attach/Detach controller of host to namespace
 
@@ -448,6 +448,7 @@ def nvmf_ns_attachment(attach, client, nqn, nsid, host, hot=False, cold=False, t
         return client.call('nvmf_ns_attach_ctrlr', params)
     else:
         return client.call('nvmf_ns_detach_ctrlr', params)
+
 
 def nvmf_subsystem_add_host(client, nqn, host, tgt_name=None):
     """Add a host NQN to the list of allowed hosts.

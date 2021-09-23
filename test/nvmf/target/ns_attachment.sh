@@ -12,31 +12,31 @@ SUBSYSNQN="nqn.2016-06.io.spdk:cnode1"
 HOSTNQN="nqn.2016-06.io.spdk:host1"
 
 function connect() {
-        nvme connect -t $TEST_TRANSPORT -n $SUBSYSNQN -q $HOSTNQN -a "$NVMF_FIRST_TARGET_IP" -s "$NVMF_PORT"
-        waitforserial "$NVMF_SERIAL" $1
-        ctrl_id=$(nvme list-subsys | sed -n "s/traddr=$NVMF_FIRST_TARGET_IP trsvcid=$NVMF_PORT//p" | sed 's/[^0-9]*//g')
+	nvme connect -t $TEST_TRANSPORT -n $SUBSYSNQN -q $HOSTNQN -a "$NVMF_FIRST_TARGET_IP" -s "$NVMF_PORT"
+	waitforserial "$NVMF_SERIAL" $1
+	ctrl_id=$(nvme list-subsys | sed -n "s/traddr=$NVMF_FIRST_TARGET_IP trsvcid=$NVMF_PORT//p" | sed 's/[^0-9]*//g')
 }
 
 function disconnect() {
-        nvme disconnect -n $SUBSYSNQN
+	nvme disconnect -n $SUBSYSNQN
 }
 
 # $1 == hex nsid
 function check_active() {
-        nvme list-ns /dev/nvme$ctrl_id | grep "$1"
-        nguid=$(nvme id-ns /dev/nvme$ctrl_id -n $1 -o json | jq -r ".nguid")
-        if [[ $nguid == "00000000000000000000000000000000" ]]; then
-                echo "Namespace with NSID $1 not active." && false
-        fi
+	nvme list-ns /dev/nvme$ctrl_id | grep "$1"
+	nguid=$(nvme id-ns /dev/nvme$ctrl_id -n $1 -o json | jq -r ".nguid")
+	if [[ $nguid == "00000000000000000000000000000000" ]]; then
+		echo "Namespace with NSID $1 not active." && false
+	fi
 }
 
 # $1 == hex nsid
 function check_inactive() {
-        NOT grep "$1" <(nvme list-ns /dev/nvme$ctrl_id)
-        nguid=$(nvme id-ns /dev/nvme$ctrl_id -n $1 -o json | jq -r ".nguid")
-        if [[ $nguid != "00000000000000000000000000000000" ]]; then
-                echo "Namespace with NSID $1 active." && false
-        fi
+	NOT grep "$1" <(nvme list-ns /dev/nvme$ctrl_id)
+	nguid=$(nvme id-ns /dev/nvme$ctrl_id -n $1 -o json | jq -r ".nguid")
+	if [[ $nguid != "00000000000000000000000000000000" ]]; then
+		echo "Namespace with NSID $1 active." && false
+	fi
 }
 
 nvmftestinit
