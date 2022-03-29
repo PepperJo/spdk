@@ -217,13 +217,20 @@ nvmf_bdev_ctrlr_identify_ns(struct spdk_nvmf_ns *ns, struct spdk_nvme_ns_data *n
 
 static void
 nvmf_bdev_ctrlr_get_rw_params(const struct spdk_nvme_cmd *cmd, uint64_t *start_lba,
-			      uint64_t *num_blocks)
+			      uint64_t *num_blocks, uint64_t *io_flags)
 {
+	uint32_t cdw12 = from_le32(&cmd->cdw12);
+
 	/* SLBA: CDW10 and CDW11 */
 	*start_lba = from_le64(&cmd->cdw10);
 
 	/* NLB: CDW12 bits 15:00, 0's based */
-	*num_blocks = (from_le32(&cmd->cdw12) & 0xFFFFu) + 1;
+	*num_blocks = (cdw12 & 0xFFFFu) + 1;
+
+	/* FUA: CDW12 bit 30 */
+	if (cdw12 & (1<<30)) {
+		*io_flags |= SPDK_BDEV_IO_FLAG_FUA;
+	}
 }
 
 static bool
@@ -293,11 +300,12 @@ nvmf_bdev_ctrlr_read_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
+	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks, io_flags);
 
 	if (spdk_unlikely(!nvmf_bdev_ctrlr_lba_in_range(bdev_num_blocks, start_lba, num_blocks))) {
 		SPDK_ERRLOG("end of media\n");
@@ -316,8 +324,9 @@ nvmf_bdev_ctrlr_read_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 
 	assert(!spdk_nvmf_request_using_zcopy(req));
 
-	rc = spdk_bdev_readv_blocks(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
-				    nvmf_bdev_ctrlr_complete_cmd, req);
+	rc = spdk_bdev_readv_blocks_ext(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
+				    nvmf_bdev_ctrlr_complete_cmd, req, &req->bdev_io_opts);
+
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, req);
@@ -339,11 +348,12 @@ nvmf_bdev_ctrlr_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
+	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks, io_flags);
 
 	if (spdk_unlikely(!nvmf_bdev_ctrlr_lba_in_range(bdev_num_blocks, start_lba, num_blocks))) {
 		SPDK_ERRLOG("end of media\n");
@@ -362,8 +372,8 @@ nvmf_bdev_ctrlr_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 
 	assert(!spdk_nvmf_request_using_zcopy(req));
 
-	rc = spdk_bdev_writev_blocks(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
-				     nvmf_bdev_ctrlr_complete_cmd, req);
+	rc = spdk_bdev_writev_blocks_ext(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
+				     nvmf_bdev_ctrlr_complete_cmd, req, &req->bdev_io_opts);
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, req);
@@ -385,11 +395,12 @@ nvmf_bdev_ctrlr_compare_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
+	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks, io_flags);
 
 	if (spdk_unlikely(!nvmf_bdev_ctrlr_lba_in_range(bdev_num_blocks, start_lba, num_blocks))) {
 		SPDK_ERRLOG("end of media\n");
@@ -430,12 +441,14 @@ nvmf_bdev_ctrlr_compare_and_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_d
 	struct spdk_nvme_cmd *cmp_cmd = &cmp_req->cmd->nvme_cmd;
 	struct spdk_nvme_cmd *write_cmd = &write_req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &write_req->rsp->nvme_cpl;
+	uint64_t *cmp_io_flags = &cmp_req->bdev_io_opts.io_flags;
+	uint64_t *write_io_flags = &write_req->bdev_io_opts.io_flags;
 	uint64_t write_start_lba, cmp_start_lba;
 	uint64_t write_num_blocks, cmp_num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(cmp_cmd, &cmp_start_lba, &cmp_num_blocks);
-	nvmf_bdev_ctrlr_get_rw_params(write_cmd, &write_start_lba, &write_num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(cmp_cmd, &cmp_start_lba, &cmp_num_blocks, cmp_io_flags);
+	nvmf_bdev_ctrlr_get_rw_params(write_cmd, &write_start_lba, &write_num_blocks, write_io_flags);
 
 	if (spdk_unlikely(write_start_lba != cmp_start_lba || write_num_blocks != cmp_num_blocks)) {
 		SPDK_ERRLOG("Fused command start lba / num blocks mismatch\n");
@@ -483,11 +496,12 @@ nvmf_bdev_ctrlr_write_zeroes_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *
 	uint64_t bdev_num_blocks = spdk_bdev_get_num_blocks(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
+	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(cmd, &start_lba, &num_blocks, io_flags);
 
 	if (spdk_unlikely(!nvmf_bdev_ctrlr_lba_in_range(bdev_num_blocks, start_lba, num_blocks))) {
 		SPDK_ERRLOG("end of media\n");
@@ -847,13 +861,14 @@ nvmf_bdev_ctrlr_zcopy_start(struct spdk_bdev *bdev,
 			    struct spdk_nvmf_request *req)
 {
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
+	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
 	uint64_t bdev_num_blocks = spdk_bdev_get_num_blocks(bdev);
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
 
-	nvmf_bdev_ctrlr_get_rw_params(&req->cmd->nvme_cmd, &start_lba, &num_blocks);
+	nvmf_bdev_ctrlr_get_rw_params(&req->cmd->nvme_cmd, &start_lba, &num_blocks, io_flags);
 
 	if (spdk_unlikely(!nvmf_bdev_ctrlr_lba_in_range(bdev_num_blocks, start_lba, num_blocks))) {
 		SPDK_ERRLOG("end of media\n");

@@ -200,6 +200,9 @@ struct spdk_bdev_opts {
 	uint32_t large_buf_pool_size;
 };
 
+/** Block device io flags */
+#define SPDK_BDEV_IO_FLAG_FUA 0x1
+
 /**
  * Structure with optional IO request parameters
  * The content of this structure must be valid until the IO request is completed
@@ -216,6 +219,8 @@ struct spdk_bdev_ext_io_opts {
 	void *memory_domain_ctx;
 	/** Metadata buffer, optional */
 	void *metadata;
+	/** Mask of bdev io flags (SPDK_BDEV_IO_FLAG_XXX) */
+	uint64_t io_flags;
 };
 
 /**

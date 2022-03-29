@@ -181,10 +181,11 @@ DEFINE_STUB(spdk_bdev_write_blocks, int,
 	     spdk_bdev_io_completion_cb cb, void *cb_arg),
 	    0);
 
-DEFINE_STUB(spdk_bdev_writev_blocks, int,
+DEFINE_STUB(spdk_bdev_writev_blocks_ext, int,
 	    (struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	     struct iovec *iov, int iovcnt, uint64_t offset_blocks, uint64_t num_blocks,
-	     spdk_bdev_io_completion_cb cb, void *cb_arg),
+	     spdk_bdev_io_completion_cb cb, void *cb_arg,
+	     struct spdk_bdev_ext_io_opts *opts),
 	    0);
 
 DEFINE_STUB(spdk_bdev_read_blocks, int,
@@ -193,10 +194,11 @@ DEFINE_STUB(spdk_bdev_read_blocks, int,
 	     spdk_bdev_io_completion_cb cb, void *cb_arg),
 	    0);
 
-DEFINE_STUB(spdk_bdev_readv_blocks, int,
+DEFINE_STUB(spdk_bdev_readv_blocks_ext, int,
 	    (struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	     struct iovec *iov, int iovcnt, uint64_t offset_blocks, uint64_t num_blocks,
-	     spdk_bdev_io_completion_cb cb, void *cb_arg),
+	     spdk_bdev_io_completion_cb cb, void *cb_arg,
+	     struct spdk_bdev_ext_io_opts *opts),
 	    0);
 
 DEFINE_STUB(spdk_bdev_write_zeroes_blocks, int,
@@ -288,14 +290,16 @@ test_get_rw_params(void)
 	struct spdk_nvme_cmd cmd = {0};
 	uint64_t lba;
 	uint64_t count;
+	uint64_t io_flags = 0;
 
 	lba = 0;
 	count = 0;
 	to_le64(&cmd.cdw10, 0x1234567890ABCDEF);
 	to_le32(&cmd.cdw12, 0x9875 | SPDK_NVME_IO_FLAGS_FORCE_UNIT_ACCESS);
-	nvmf_bdev_ctrlr_get_rw_params(&cmd, &lba, &count);
+	nvmf_bdev_ctrlr_get_rw_params(&cmd, &lba, &count, &io_flags);
 	CU_ASSERT(lba == 0x1234567890ABCDEF);
 	CU_ASSERT(count == 0x9875 + 1); /* NOTE: this field is 0's based, hence the +1 */
+	CU_ASSERT(io_flags == SPDK_BDEV_IO_FLAG_FUA);
 }
 
 static void

@@ -169,7 +169,8 @@ bdev_aio_close(struct file_disk *disk)
 static void
 bdev_aio_readv(struct file_disk *fdisk, struct spdk_io_channel *ch,
 	       struct bdev_aio_task *aio_task,
-	       struct iovec *iov, int iovcnt, uint64_t nbytes, uint64_t offset)
+	       struct iovec *iov, int iovcnt, uint64_t nbytes, uint64_t offset,
+	       uint32_t aio_rw_flags)
 {
 	struct iocb *iocb = &aio_task->iocb;
 	struct bdev_aio_io_channel *aio_ch = spdk_io_channel_get_ctx(ch);
@@ -180,11 +181,12 @@ bdev_aio_readv(struct file_disk *fdisk, struct spdk_io_channel *ch,
 		io_set_eventfd(iocb, aio_ch->group_ch->efd);
 	}
 	iocb->data = aio_task;
+	iocb->aio_rw_flags = aio_rw_flags;
 	aio_task->len = nbytes;
 	aio_task->ch = aio_ch;
 
-	SPDK_DEBUGLOG(aio, "read %d iovs size %lu to off: %#lx\n",
-		      iovcnt, nbytes, offset);
+	SPDK_DEBUGLOG(aio, "read %d iovs size %lu to off: %#lx with flags %x\n",
+		      iovcnt, nbytes, offset, iocb->aio_rw_flags);
 
 	rc = io_submit(aio_ch->io_ctx, 1, &iocb);
 	if (spdk_unlikely(rc < 0)) {
@@ -202,7 +204,8 @@ bdev_aio_readv(struct file_disk *fdisk, struct spdk_io_channel *ch,
 static void
 bdev_aio_writev(struct file_disk *fdisk, struct spdk_io_channel *ch,
 		struct bdev_aio_task *aio_task,
-		struct iovec *iov, int iovcnt, size_t len, uint64_t offset)
+		struct iovec *iov, int iovcnt, size_t len, uint64_t offset,
+		uint32_t aio_rw_flags)
 {
 	struct iocb *iocb = &aio_task->iocb;
 	struct bdev_aio_io_channel *aio_ch = spdk_io_channel_get_ctx(ch);
@@ -213,11 +216,12 @@ bdev_aio_writev(struct file_disk *fdisk, struct spdk_io_channel *ch,
 		io_set_eventfd(iocb, aio_ch->group_ch->efd);
 	}
 	iocb->data = aio_task;
+	iocb->aio_rw_flags = aio_rw_flags;
 	aio_task->len = len;
 	aio_task->ch = aio_ch;
 
-	SPDK_DEBUGLOG(aio, "write %d iovs size %lu from off: %#lx\n",
-		      iovcnt, len, offset);
+	SPDK_DEBUGLOG(aio, "write %d iovs size %lu from off: %#lx with flags %x\n",
+		      iovcnt, len, offset, iocb->aio_rw_flags);
 
 	rc = io_submit(aio_ch->io_ctx, 1, &iocb);
 	if (spdk_unlikely(rc < 0)) {
@@ -464,13 +468,26 @@ bdev_aio_reset(struct file_disk *fdisk, struct bdev_aio_task *aio_task)
 	bdev_aio_reset_retry_timer(fdisk);
 }
 
+static uint32_t
+bdev_flags_to_aio_flags(uint64_t io_flags)
+{
+	return io_flags & SPDK_BDEV_IO_FLAG_FUA ? RWF_SYNC : 0;
+}
+
 static void
 bdev_aio_get_buf_cb(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io,
 		    bool success)
 {
+	struct spdk_bdev_ext_io_opts *ext_opts = bdev_io->u.bdev.ext_opts;
+	uint32_t aio_rw_flags = 0;
+	
 	if (!success) {
 		spdk_bdev_io_complete(bdev_io, SPDK_BDEV_IO_STATUS_FAILED);
 		return;
+	}
+
+	if (ext_opts != NULL) {
+		aio_rw_flags = bdev_flags_to_aio_flags(ext_opts->io_flags);
 	}
 
 	switch (bdev_io->type) {
@@ -481,7 +498,8 @@ bdev_aio_get_buf_cb(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io,
 			       bdev_io->u.bdev.iovs,
 			       bdev_io->u.bdev.iovcnt,
 			       bdev_io->u.bdev.num_blocks * bdev_io->bdev->blocklen,
-			       bdev_io->u.bdev.offset_blocks * bdev_io->bdev->blocklen);
+			       bdev_io->u.bdev.offset_blocks * bdev_io->bdev->blocklen,
+			       aio_rw_flags);
 		break;
 	case SPDK_BDEV_IO_TYPE_WRITE:
 		bdev_aio_writev((struct file_disk *)bdev_io->bdev->ctxt,
@@ -490,7 +508,8 @@ bdev_aio_get_buf_cb(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io,
 				bdev_io->u.bdev.iovs,
 				bdev_io->u.bdev.iovcnt,
 				bdev_io->u.bdev.num_blocks * bdev_io->bdev->blocklen,
-				bdev_io->u.bdev.offset_blocks * bdev_io->bdev->blocklen);
+				bdev_io->u.bdev.offset_blocks * bdev_io->bdev->blocklen,
+				aio_rw_flags);
 		break;
 	default:
 		SPDK_ERRLOG("Wrong io type\n");
