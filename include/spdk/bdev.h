@@ -1438,6 +1438,34 @@ int spdk_bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_ch
 				  spdk_bdev_io_completion_cb cb, void *cb_arg);
 
 /**
+ * Submit a write zeroes request to the bdev on the given channel. This command
+ *  ensures that all bytes in the specified range are set to 00h
+ *
+ * \ingroup bdev_io_submit_functions
+ *
+ * \param desc Block device descriptor.
+ * \param ch I/O channel. Obtained by calling spdk_bdev_get_io_channel().
+ * \param offset_blocks The offset, in blocks, from the start of the block device.
+ * \param num_blocks The number of blocks to zero.
+ * \param cb Called when the request is complete.
+ * \param cb_arg Argument passed to cb.
+ * \param opts Optional structure with extended IO request options. If set, this structure must be
+ * valid until the IO is completed. `size` member of this structure is used for ABI compatibility and
+ * must be set to sizeof(struct spdk_bdev_ext_io_opts).
+ *
+ * \return 0 on success. On success, the callback will always
+ * be called (even if the request ultimately failed). Return
+ * negated errno on failure, in which case the callback will not be called.
+ *   * -EINVAL - offset_blocks and/or num_blocks are out of range
+ *   * -ENOMEM - spdk_bdev_io buffer cannot be allocated
+ *   * -EBADF - desc not open for writing
+ */
+int spdk_bdev_write_zeroes_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+				      uint64_t offset_blocks, uint64_t num_blocks,
+				      spdk_bdev_io_completion_cb cb, void *cb_arg,
+				      struct spdk_bdev_ext_io_opts *opts);				  
+
+/**
  * Submit an unmap request to the block device. Unmap is sometimes also called trim or
  * deallocate. This notifies the device that the data in the blocks described is no
  * longer valid. Reading blocks that have been unmapped results in indeterminate data.
