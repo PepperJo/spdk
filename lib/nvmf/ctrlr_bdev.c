@@ -228,7 +228,7 @@ nvmf_bdev_ctrlr_get_rw_params(const struct spdk_nvme_cmd *cmd, uint64_t *start_l
 	*num_blocks = (cdw12 & 0xFFFFu) + 1;
 
 	/* FUA: CDW12 bit 30 */
-	if (cdw12 & (1<<30)) {
+	if (cdw12 & SPDK_NVME_IO_FLAGS_FORCE_UNIT_ACCESS) {
 		*io_flags |= SPDK_BDEV_IO_FLAG_FUA;
 	}
 }
