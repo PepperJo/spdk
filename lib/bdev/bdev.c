@@ -2344,10 +2344,11 @@ bdev_io_split_submit(struct spdk_bdev_io *bdev_io, struct iovec *iov, int iovcnt
 		break;
 	case SPDK_BDEV_IO_TYPE_WRITE_ZEROES:
 		io_wait_fn = _bdev_write_zeroes_split;
-		rc = spdk_bdev_write_zeroes_blocks(bdev_io->internal.desc,
-						   spdk_io_channel_from_ctx(bdev_io->internal.ch),
-						   current_offset, num_blocks,
-						   bdev_io_split_done, bdev_io);
+		rc = bdev_write_zeroes_blocks(bdev_io->internal.desc,
+					      spdk_io_channel_from_ctx(bdev_io->internal.ch),
+					      current_offset, num_blocks,
+					      bdev_io_split_done, bdev_io,
+					      bdev_io->internal.ext_opts, true);
 		break;
 	default:
 		assert(false);
