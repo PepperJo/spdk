@@ -300,7 +300,8 @@ nvmf_bdev_ctrlr_read_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
-	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
+	struct spdk_bdev_ext_io_opts *bdev_io_opts = &req->bdev_io_opts;
+	uint64_t *io_flags = &bdev_io_opts->io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
@@ -325,7 +326,7 @@ nvmf_bdev_ctrlr_read_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	assert(!spdk_nvmf_request_using_zcopy(req));
 
 	rc = spdk_bdev_readv_blocks_ext(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
-				    nvmf_bdev_ctrlr_complete_cmd, req, &req->bdev_io_opts);
+				        nvmf_bdev_ctrlr_complete_cmd, req, bdev_io_opts);
 
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
@@ -348,7 +349,8 @@ nvmf_bdev_ctrlr_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
-	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
+	struct spdk_bdev_ext_io_opts *bdev_io_opts = &req->bdev_io_opts;
+	uint64_t *io_flags = &bdev_io_opts->io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
@@ -373,7 +375,7 @@ nvmf_bdev_ctrlr_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	assert(!spdk_nvmf_request_using_zcopy(req));
 
 	rc = spdk_bdev_writev_blocks_ext(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
-				     nvmf_bdev_ctrlr_complete_cmd, req, &req->bdev_io_opts);
+					 nvmf_bdev_ctrlr_complete_cmd, req, bdev_io_opts);
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, req);
@@ -395,7 +397,8 @@ nvmf_bdev_ctrlr_compare_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 	uint32_t block_size = spdk_bdev_get_block_size(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
-	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
+	struct spdk_bdev_ext_io_opts *bdev_io_opts = &req->bdev_io_opts;
+	uint64_t *io_flags = &bdev_io_opts->io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
@@ -417,8 +420,8 @@ nvmf_bdev_ctrlr_compare_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *desc,
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	rc = spdk_bdev_comparev_blocks(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
-				       nvmf_bdev_ctrlr_complete_cmd, req);
+	rc = spdk_bdev_comparev_blocks_ext(desc, ch, req->iov, req->iovcnt, start_lba, num_blocks,
+					   nvmf_bdev_ctrlr_complete_cmd, req, bdev_io_opts);
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, req);
@@ -441,8 +444,10 @@ nvmf_bdev_ctrlr_compare_and_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_d
 	struct spdk_nvme_cmd *cmp_cmd = &cmp_req->cmd->nvme_cmd;
 	struct spdk_nvme_cmd *write_cmd = &write_req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &write_req->rsp->nvme_cpl;
-	uint64_t *cmp_io_flags = &cmp_req->bdev_io_opts.io_flags;
-	uint64_t *write_io_flags = &write_req->bdev_io_opts.io_flags;
+	struct spdk_bdev_ext_io_opts *cmp_bdev_io_opts = &cmp_req->bdev_io_opts;
+	uint64_t *cmp_io_flags = &cmp_bdev_io_opts->io_flags;
+	struct spdk_bdev_ext_io_opts *write_bdev_io_opts = &write_req->bdev_io_opts;
+	uint64_t *write_io_flags = &write_bdev_io_opts->io_flags;
 	uint64_t write_start_lba, cmp_start_lba;
 	uint64_t write_num_blocks, cmp_num_blocks;
 	int rc;
@@ -473,8 +478,9 @@ nvmf_bdev_ctrlr_compare_and_write_cmd(struct spdk_bdev *bdev, struct spdk_bdev_d
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ch, cmp_req->iov, cmp_req->iovcnt, write_req->iov,
-			write_req->iovcnt, write_start_lba, write_num_blocks, nvmf_bdev_ctrlr_complete_cmd, write_req);
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ch, cmp_req->iov, cmp_req->iovcnt, write_req->iov, write_req->iovcnt,
+						      write_start_lba, write_num_blocks, nvmf_bdev_ctrlr_complete_cmd, write_req,
+						      cmp_bdev_io_opts, write_bdev_io_opts);
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(cmp_req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, cmp_req);
@@ -496,7 +502,8 @@ nvmf_bdev_ctrlr_write_zeroes_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *
 	uint64_t bdev_num_blocks = spdk_bdev_get_num_blocks(bdev);
 	struct spdk_nvme_cmd *cmd = &req->cmd->nvme_cmd;
 	struct spdk_nvme_cpl *rsp = &req->rsp->nvme_cpl;
-	uint64_t *io_flags = &req->bdev_io_opts.io_flags;
+	struct spdk_bdev_ext_io_opts *bdev_io_opts = &req->bdev_io_opts;
+	uint64_t *io_flags = &bdev_io_opts->io_flags;
 	uint64_t start_lba;
 	uint64_t num_blocks;
 	int rc;
@@ -510,8 +517,8 @@ nvmf_bdev_ctrlr_write_zeroes_cmd(struct spdk_bdev *bdev, struct spdk_bdev_desc *
 		return SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE;
 	}
 
-	rc = spdk_bdev_write_zeroes_blocks(desc, ch, start_lba, num_blocks,
-					   nvmf_bdev_ctrlr_complete_cmd, req);
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, ch, start_lba, num_blocks,
+					       nvmf_bdev_ctrlr_complete_cmd, req, bdev_io_opts);
 	if (spdk_unlikely(rc)) {
 		if (rc == -ENOMEM) {
 			nvmf_bdev_ctrl_queue_io(req, bdev, ch, nvmf_ctrlr_process_io_cmd_resubmit, req);

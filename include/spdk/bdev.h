@@ -1347,6 +1347,57 @@ int spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spd
 		spdk_bdev_io_completion_cb cb, void *cb_arg);
 
 /**
+ * Submit an atomic compare-and-write request to the bdev on the given channel.
+ * For bdevs that do not natively support atomic compare-and-write, the bdev layer
+ * will quiesce I/O to the specified LBA range, before performing the read,
+ * compare and write operations.
+ *
+ * Currently this supports compare-and-write of only one block.
+ *
+ * The data buffers for both the compare and write operations are described in a
+ * scatter gather list. Some physical devices place memory alignment requirements on
+ * data and may not be able to directly transfer out of the buffers provided. In
+ * this case, the request may fail.
+ *
+ * spdk_bdev_io_get_nvme_fused_status() function should be called in callback function
+ * to get status for the individual operation.
+ *
+ * \ingroup bdev_io_submit_functions
+ *
+ * \param desc Block device descriptor.
+ * \param ch I/O channel. Obtained by calling spdk_bdev_get_io_channel().
+ * \param compare_iov A scatter gather list of buffers to be compared.
+ * \param compare_iovcnt The number of elements in compare_iov.
+ * \param write_iov A scatter gather list of buffers to be written if the compare is
+ *                  successful.
+ * \param write_iovcnt The number of elements in write_iov.
+ * \param offset_blocks The offset, in blocks, from the start of the block device.
+ * \param num_blocks The number of blocks to compare-and-write.
+ * \param cb Called when the request is complete.
+ * \param cb_arg Argument passed to cb.
+ * \param compare_opts Optional structure with extended IO request options. If set, this structure must be
+ * valid until the IO is completed. `size` member of this structure is used for ABI compatibility and
+ * must be set to sizeof(struct spdk_bdev_ext_io_opts).
+ * \param write_opts Optional structure with extended IO request options. If set, this structure must be
+ * valid until the IO is completed. `size` member of this structure is used for ABI compatibility and
+ * must be set to sizeof(struct spdk_bdev_ext_io_opts).
+ *
+ * \return 0 on success. On success, the callback will always
+ * be called (even if the request ultimately failed). Return
+ * negated errno on failure, in which case the callback will not be called.
+ *   * -EINVAL - offset_blocks and/or num_blocks are out of range
+ *   * -ENOMEM - spdk_bdev_io buffer cannot be allocated
+ *   * -EBADF - desc not open for writing
+ */
+int spdk_bdev_comparev_and_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+		struct iovec *compare_iov, int compare_iovcnt,
+		struct iovec *write_iov, int write_iovcnt,
+		uint64_t offset_blocks, uint64_t num_blocks,
+		spdk_bdev_io_completion_cb cb, void *cb_arg,
+		struct spdk_bdev_ext_io_opts *compare_opts,
+		struct spdk_bdev_ext_io_opts *write_opts);
+
+/**
  * Submit a request to acquire a data buffer that represents the given
  * range of blocks. The data buffer is placed in the spdk_bdev_io structure
  * and can be obtained by calling spdk_bdev_io_get_iovec().

@@ -4690,11 +4690,13 @@ bdev_comparev_and_writev_blocks_locked(void *ctx, int status)
 }
 
 int
-spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 				     struct iovec *compare_iov, int compare_iovcnt,
 				     struct iovec *write_iov, int write_iovcnt,
 				     uint64_t offset_blocks, uint64_t num_blocks,
-				     spdk_bdev_io_completion_cb cb, void *cb_arg)
+				     spdk_bdev_io_completion_cb cb, void *cb_arg,
+				     struct spdk_bdev_ext_io_opts *compare_opts,
+				     struct spdk_bdev_ext_io_opts *write_opts)
 {
 	struct spdk_bdev *bdev = spdk_bdev_desc_get_bdev(desc);
 	struct spdk_bdev_io *bdev_io;
@@ -4719,10 +4721,12 @@ spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io
 
 	bdev_io->u.bdev.fused_iovs = write_iov;
 	bdev_io->u.bdev.fused_iovcnt = write_iovcnt;
+	bdev_io->u.bdev.fused_ext_opts = write_opts;
+	bdev_io->internal.fused_ext_opts = write_opts;
 
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE_AND_WRITE,
 			 desc, channel, compare_iov, compare_iovcnt, NULL,
-			 offset_blocks, num_blocks, cb, cb_arg, NULL);
+			 offset_blocks, num_blocks, cb, cb_arg, compare_opts);
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE_AND_WRITE)) {
 		bdev_io_submit(bdev_io);
@@ -4731,6 +4735,36 @@ spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io
 
 	return bdev_lock_lba_range(desc, ch, offset_blocks, num_blocks,
 				   bdev_comparev_and_writev_blocks_locked, bdev_io);
+}
+
+int
+spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+				     struct iovec *compare_iov, int compare_iovcnt,
+				     struct iovec *write_iov, int write_iovcnt,
+				     uint64_t offset_blocks, uint64_t num_blocks,
+				     spdk_bdev_io_completion_cb cb, void *cb_arg)
+{
+	return bdev_comparev_and_writev_blocks(desc, ch, compare_iov, compare_iovcnt, write_iov, write_iovcnt,
+					       offset_blocks, num_blocks, cb, cb_arg, NULL, NULL);
+}
+
+int
+spdk_bdev_comparev_and_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+					 struct iovec *compare_iov, int compare_iovcnt,
+					 struct iovec *write_iov, int write_iovcnt,
+					 uint64_t offset_blocks, uint64_t num_blocks,
+					 spdk_bdev_io_completion_cb cb, void *cb_arg,
+					 struct spdk_bdev_ext_io_opts *compare_opts,
+					 struct spdk_bdev_ext_io_opts *write_opts)
+{
+	/** we currently don't support metadata for cmp & write */
+	if (compare_opts && compare_opts->metadata || write_opts && write_opts->metadata) {
+		return -ENOTSUP;
+	}
+
+	return bdev_comparev_and_writev_blocks(desc, ch, compare_iov, compare_iovcnt, write_iov,
+					       write_iovcnt, offset_blocks, num_blocks, cb, cb_arg,
+					       compare_opts, write_opts);
 }
 
 int
