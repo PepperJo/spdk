@@ -4181,13 +4181,11 @@ spdk_bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chann
 }
 
 static bool
-bdev_ext_io_opts_get_metadata(struct spdk_bdev_ext_io_opts *opts, void **md)
+bdev_ext_io_opts_valid(struct spdk_bdev_ext_io_opts *opts)
 {
 	if (spdk_unlikely(!opts->size || opts->size > sizeof(struct spdk_bdev_ext_io_opts))) {
 		return false;
 	}
-	*md = opts->metadata;
-
 	return true;
 }
 
@@ -4201,9 +4199,10 @@ spdk_bdev_readv_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 	void *md = NULL;
 
 	if (opts) {
-		if (!bdev_ext_io_opts_get_metadata(opts, &md)) {
+		if (!bdev_ext_io_opts_valid(opts)) {
 			return -EINVAL;
 		}
+		md = opts->metadata;
 		if (md && !bdev_is_md_valid(md, desc, iov)) {
 			return -EINVAL;
 		}
@@ -4375,9 +4374,10 @@ spdk_bdev_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 	void *md = NULL;
 
 	if (opts) {
-		if (!bdev_ext_io_opts_get_metadata(opts, &md)) {
+		if (!bdev_ext_io_opts_valid(opts)) {
 			return -EINVAL;
 		}
+		md = opts->metadata;
 		if (md && !bdev_is_md_valid(md, desc, iov)) {
 			return -EINVAL;
 		}
@@ -4511,9 +4511,10 @@ int spdk_bdev_comparev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 	void *md = NULL;
 
 	if (opts) {
-		if (!bdev_ext_io_opts_get_metadata(opts, &md)) {
+		if (!bdev_ext_io_opts_valid(opts)) {
 			return -EINVAL;
 		}
+		md = opts->metadata;
 		if (md && !bdev_is_md_valid(md, desc, iov)) {
 			return -EINVAL;
 		}
@@ -4758,8 +4759,21 @@ spdk_bdev_comparev_and_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spd
 					 struct spdk_bdev_ext_io_opts *write_opts)
 {
 	/** we currently don't support metadata for cmp & write */
-	if (compare_opts && compare_opts->metadata || write_opts && write_opts->metadata) {
-		return -ENOTSUP;
+	if (compare_opts) {
+		if (!bdev_ext_io_opts_valid(compare_opts)) {
+			return -EINVAL;
+		}
+		if (compare_opts->metadata) {
+			return -ENOTSUP;
+		}
+	}
+	if (write_opts) {
+		if (!bdev_ext_io_opts_valid(write_opts)) {
+			return -EINVAL;
+		}
+		if (write_opts->metadata) {
+			return -ENOTSUP;
+		}
 	}
 
 	return bdev_comparev_and_writev_blocks(desc, ch, compare_iov, compare_iovcnt, write_iov,
@@ -4842,8 +4856,13 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 	}
 
 	/** users should not provide a metadata buffer */
-	if (opts && opts->metadata) {
-		return -EINVAL
+	if (opts) {
+		if (!bdev_ext_io_opts_valid(opts)) {
+			return -EINVAL;
+		}
+		if (opts->metadata) {
+			return -EINVAL;
+		}
 	}
 
 	if (!bdev_io_valid_blocks(bdev, offset_blocks, num_blocks)) {
