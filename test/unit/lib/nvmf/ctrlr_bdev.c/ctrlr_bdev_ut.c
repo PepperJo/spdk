@@ -700,7 +700,7 @@ test_nvmf_bdev_ctrlr_cmd(void)
 	/* Device error */
 	req.length = 4096;
 	memset(&rsp, 0, sizeof(rsp));
-	MOCK_SET(spdk_bdev_comparev_blocks, -1);
+	MOCK_SET(spdk_bdev_comparev_blocks_ext, -1);
 
 	rc = nvmf_bdev_ctrlr_compare_cmd(&bdev, NULL, &ch, &req);
 	CU_ASSERT(rc == SPDK_NVMF_REQUEST_EXEC_STATUS_COMPLETE);
@@ -748,7 +748,7 @@ test_nvmf_bdev_ctrlr_cmd(void)
 	CU_ASSERT(rsp.nvme_cpl.status.sc == SPDK_NVME_SC_LBA_OUT_OF_RANGE);
 
 	/* Write block error */
-	MOCK_SET(spdk_bdev_write_zeroes_blocks, -1);
+	MOCK_SET(spdk_bdev_write_zeroes_blocks_ext, -1);
 	cmd.nvme_cmd.cdw10 = 0;
 	memset(&rsp, 0, sizeof(rsp));
 
