@@ -396,6 +396,7 @@ nvmf_fc_conn_alloc_fc_request(struct spdk_nvmf_fc_conn *fc_conn)
 	fc_req = (struct spdk_nvmf_fc_request *)pooled_req;
 	memset(fc_req, 0, sizeof(struct spdk_nvmf_fc_request));
 	nvmf_fc_request_set_state(fc_req, SPDK_NVMF_FC_REQ_INIT);
+	fc_req->req.bdev_io_opts.size = sizeof(struct spdk_bdev_ext_io_opts);
 
 	TAILQ_INSERT_TAIL(&hwqp->in_use_reqs, fc_req, link);
 	TAILQ_INSERT_TAIL(&fc_conn->in_use_reqs, fc_req, conn_link);

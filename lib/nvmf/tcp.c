@@ -1123,6 +1123,7 @@ nvmf_tcp_qpair_init_mem_resource(struct spdk_nvmf_tcp_qpair *tqpair)
 		tcp_req->req.cmd = (union nvmf_h2c_msg *)&tcp_req->cmd;
 
 		tcp_req->req.stripped_data = NULL;
+		tcp_req->req.bdev_io_opts.size = sizeof(struct spdk_bdev_ext_io_opts);
 
 		/* Initialize request state to FREE */
 		tcp_req->state = TCP_REQUEST_STATE_FREE;

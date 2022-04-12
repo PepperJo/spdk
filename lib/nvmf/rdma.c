@@ -824,6 +824,7 @@ nvmf_rdma_resources_create(struct spdk_nvmf_rdma_resource_opts *opts)
 		rdma_req->req.cmd = NULL;
 		rdma_req->req.iovcnt = 0;
 		rdma_req->req.stripped_data = NULL;
+		rdma_req->req.bdev_io_opts.size = sizeof(struct spdk_bdev_ext_io_opts);
 
 		/* Set up memory to send responses */
 		rdma_req->req.rsp = &resources->cpls[i];

@@ -1829,6 +1829,7 @@ alloc_sq_reqs(struct nvmf_vfio_user_ctrlr *vu_ctrlr, struct nvmf_vfio_user_sq *s
 		req->rsp = (union nvmf_c2h_msg *)&vu_req->rsp;
 		req->cmd = (union nvmf_h2c_msg *)&vu_req->cmd;
 		req->stripped_data = NULL;
+		req->bdev_io_opts.size = sizeof(struct spdk_bdev_ext_io_opts);
 
 		TAILQ_INSERT_TAIL(&sq->free_reqs, vu_req, link);
 	}
