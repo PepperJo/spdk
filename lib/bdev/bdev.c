@@ -4240,8 +4240,8 @@ bdev_write_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 		return -ENOMEM;
 	}
 
-	bdev_io->iovs[0].iov_base = buf;
-	bdev_io->iovs[0].iov_len = num_blocks * bdev->blocklen;
+	bdev_io->iov.iov_base = buf;
+	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
@@ -4284,7 +4284,7 @@ spdk_bdev_write_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chann
 		.iov_base = buf,
 	};
 
-	if (!bdev_is_md_valid(md_buf, desc, &iov) {
+	if (!bdev_is_md_valid(md_buf, desc, &iov)) {
 		return -EINVAL;
 	}
 
@@ -4302,7 +4302,6 @@ bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 	struct spdk_bdev *bdev = spdk_bdev_desc_get_bdev(desc);
 	struct spdk_bdev_io *bdev_io;
 	struct spdk_bdev_channel *channel = spdk_io_channel_get_ctx(ch);
-	struct spdk_bdev_ext_io_opts *opts_copy;
 
 	if (!desc->write) {
 		return -EBADF;
@@ -4696,7 +4695,7 @@ bdev_comparev_and_writev_blocks_locked(void *ctx, int status)
 	bdev_compare_and_write_do_compare(bdev_io);
 }
 
-int
+static int
 bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 				     struct iovec *compare_iov, int compare_iovcnt,
 				     struct iovec *write_iov, int write_iovcnt,
@@ -4981,8 +4980,8 @@ spdk_bdev_unmap_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		return -ENOMEM;
 	}
 
-	bdev_io->iovs[0].iov_base = NULL;
-	bdev_io->iovs[0].iov_len = 0;
+	bdev_io->iov.iov_base = NULL;
+	bdev_io->iov.iov_len = 0;
 
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_UNMAP, desc,
 			 channel, &bdev_io->iov, 1, NULL,
