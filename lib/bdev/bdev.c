@@ -4633,11 +4633,12 @@ bdev_compare_and_write_do_write(void *_bdev_io)
 	struct spdk_bdev_io *bdev_io = _bdev_io;
 	int rc;
 
-	rc = spdk_bdev_writev_blocks(bdev_io->internal.desc,
-				     spdk_io_channel_from_ctx(bdev_io->internal.ch),
-				     bdev_io->u.bdev.fused_iovs, bdev_io->u.bdev.fused_iovcnt,
-				     bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
-				     bdev_compare_and_write_do_write_done, bdev_io);
+	rc = spdk_bdev_writev_blocks_ext(bdev_io->internal.desc,
+				     	 spdk_io_channel_from_ctx(bdev_io->internal.ch),
+				     	 bdev_io->u.bdev.fused_iovs, bdev_io->u.bdev.fused_iovcnt,
+				     	 bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
+				     	 bdev_compare_and_write_do_write_done, bdev_io,
+					 bdev_io->u.bdev.fused_ext_opts);
 
 
 	if (rc == -ENOMEM) {
@@ -4668,10 +4669,10 @@ bdev_compare_and_write_do_compare(void *_bdev_io)
 	struct spdk_bdev_io *bdev_io = _bdev_io;
 	int rc;
 
-	rc = spdk_bdev_comparev_blocks(bdev_io->internal.desc,
-				       spdk_io_channel_from_ctx(bdev_io->internal.ch), bdev_io->u.bdev.iovs,
-				       bdev_io->u.bdev.iovcnt, bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
-				       bdev_compare_and_write_do_compare_done, bdev_io);
+	rc = spdk_bdev_comparev_blocks_ext(bdev_io->internal.desc,
+				       	   spdk_io_channel_from_ctx(bdev_io->internal.ch), bdev_io->u.bdev.iovs,
+				           bdev_io->u.bdev.iovcnt, bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
+				           bdev_compare_and_write_do_compare_done, bdev_io, bdev_io->u.bdev.ext_opts);
 
 	if (rc == -ENOMEM) {
 		bdev_queue_io_wait_with_cb(bdev_io, bdev_compare_and_write_do_compare);
