@@ -3367,7 +3367,7 @@ bdev_compare_and_write(void)
 	};
 	struct spdk_bdev_ext_io_opts write_opts = {
 		.size = sizeof(struct spdk_bdev_ext_io_opts),
-		.io_flags = SPDK_BDEV_IO_FLAG_FUAs
+		.io_flags = SPDK_BDEV_IO_FLAG_FUA
 	};
 	int rc;
 
@@ -3429,13 +3429,13 @@ bdev_compare_and_write(void)
 	/* compare and write currently does not support metadata */
 	compare_opts.metadata = (void *)0xFF000000;
 	write_opts.metadata = (void *)0xFF000000;
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, compare_opts, NULL);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, NULL, write_opts);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, compare_opts, write_opts);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
 	compare_opts.metadata = NULL;
@@ -3444,25 +3444,25 @@ bdev_compare_and_write(void)
 	/* Invalid ext_opts size */
 	compare_opts.size = 0;
 	write_opts.size = 0;
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, &compare_opts, NULL);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, NULL, &write_opts);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, &compare_opts, &write_opts);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
 	
 	compare_opts.size = sizeof(struct spdk_bdev_ext_io_opts) * 2;
 	write_opts.size = sizeof(struct spdk_bdev_ext_io_opts) * 2;
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, &compare_opts, NULL);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, NULL, &write_opts);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
-	rc = spdk_bdev_comparev_and_writev_blocks(desc, ioch, &compare_iov, 1, &write_iov, 1,
+	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, &compare_opts, &write_opts);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
 	compare_opts.size = sizeof(struct spdk_bdev_ext_io_opts);
