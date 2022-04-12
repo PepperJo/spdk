@@ -582,6 +582,9 @@ struct spdk_bdev_io {
 			/** Pointer to user's ext opts to be used by bdev modules */
 			struct spdk_bdev_ext_io_opts *ext_opts;
 
+			/** Pointer to user's ext opts to be used by bdev modules */
+			struct spdk_bdev_ext_io_opts *fused_ext_opts;
+
 			/** stored user callback in case we split the I/O and use a temporary callback */
 			spdk_bdev_io_completion_cb stored_user_cb;
 
@@ -746,6 +749,9 @@ struct spdk_bdev_io {
 
 		/** Pointer to a structure passed by the user in ext API */
 		struct spdk_bdev_ext_io_opts *ext_opts;
+
+		/** Pointer to user's ext opts to be used by bdev modules */
+		struct spdk_bdev_ext_io_opts *fused_ext_opts;
 
 		/** Copy of user's opts, used when I/O is split */
 		struct spdk_bdev_ext_io_opts ext_opts_copy;
