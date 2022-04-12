@@ -5058,7 +5058,7 @@ bdev_io_ext(void)
 	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
-	rc = spdk_bdev_write_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
 
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(g_io_done == false);
@@ -5157,7 +5157,7 @@ bdev_io_ext(void)
 	CU_ASSERT(rc == -EINVAL);
 	rc = spdk_bdev_comparev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
-	rc = spdk_bdev_writev_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
 
 	ext_io_opts.size = sizeof(ext_io_opts) * 2;
@@ -5167,7 +5167,7 @@ bdev_io_ext(void)
 	CU_ASSERT(rc == -EINVAL);
 	rc = spdk_bdev_comparev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
-	rc = spdk_bdev_writev_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
 
 	/** write zeroes does not allow metadata */
