@@ -3430,13 +3430,13 @@ bdev_compare_and_write(void)
 	compare_opts.metadata = (void *)0xFF000000;
 	write_opts.metadata = (void *)0xFF000000;
 	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
-			offset, num_blocks, io_done, NULL, compare_opts, NULL);
+			offset, num_blocks, io_done, NULL, &compare_opts, NULL);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
 	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
-			offset, num_blocks, io_done, NULL, NULL, write_opts);
+			offset, num_blocks, io_done, NULL, NULL, &write_opts);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
 	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
-			offset, num_blocks, io_done, NULL, compare_opts, write_opts);
+			offset, num_blocks, io_done, NULL, &compare_opts, &write_opts);
 	CU_ASSERT_EQUAL(rc, -ENOTSUP);
 	compare_opts.metadata = NULL;
 	write_opts.metadata = NULL;
