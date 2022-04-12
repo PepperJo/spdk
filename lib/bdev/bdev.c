@@ -4432,8 +4432,8 @@ bdev_compare_do_read(void *_bdev_io)
 	struct spdk_bdev_io *bdev_io = _bdev_io;
 	int rc;
 
-	rc = spdk_bdev_read_blocks_ext(bdev_io->internal.desc,
-				       spdk_io_channel_from_ctx(bdev_io->internal.ch), NULL,
+	rc = spdk_bdev_readv_blocks_ext(bdev_io->internal.desc,
+				       spdk_io_channel_from_ctx(bdev_io->internal.ch), NULL, 0,
 				       bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
 				       bdev_compare_do_read_done, bdev_io, bdev_io->u.bdev.ext_opts);
 
