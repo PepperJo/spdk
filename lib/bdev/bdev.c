@@ -4153,7 +4153,7 @@ bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 	
-	if (copy_opts) {
+	if (opts && copy_opts) {
 		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
@@ -4319,7 +4319,7 @@ bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
-	if (copy_opts) {
+	if (opts && copy_opts) {
 		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
@@ -4469,7 +4469,7 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 	
-	if (copy_opts) {
+	if (opts && copy_opts) {
 		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
@@ -4887,7 +4887,7 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE_ZEROES, desc,
 			 channel, NULL, 0, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, opts);
-	if (copy_opts) {
+	if (opts && copy_opts) {
 		bdev_io_copy_ext_io_opts(bdev_io, NULL);
 	}
 
