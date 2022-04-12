@@ -371,6 +371,12 @@ bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 			   struct spdk_bdev_ext_io_opts *opts, bool copy_opts);
 
 static int
+bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
+                         uint64_t offset_blocks, uint64_t num_blocks,
+                         spdk_bdev_io_completion_cb cb, void *cb_arg,
+                         struct spdk_bdev_ext_io_opts *opts, bool copy_opts);
+
+static int
 bdev_lock_lba_range(struct spdk_bdev_desc *desc, struct spdk_io_channel *_ch,
 		    uint64_t offset, uint64_t length,
 		    lock_range_cb cb_fn, void *cb_arg);
@@ -4013,7 +4019,7 @@ bdev_io_init_ext(struct spdk_bdev *bdev, struct spdk_bdev_io *bdev_io,
 }
 
 static void
-bdev_io_copy_ext_io_opts(struct spdk_bdev_io *bdev_io)
+bdev_io_copy_ext_io_opts(struct spdk_bdev_io *bdev_io, void *md_buf)
 {
 	struct spdk_bdev_ext_io_opts *opts_copy;
 	struct spdk_bdev_ext_io_opts *opts = bdev_io->internal.ext_opts;
@@ -4044,8 +4050,8 @@ bdev_read_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 		return -ENOMEM;
 	}
 
-	bdev_io->iovs[0].iov_base = buf;
-	bdev_io->iovs[0].iov_len = num_blocks * bdev->blocklen;
+	bdev_io->iov.iov_base = buf;
+	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
@@ -4144,12 +4150,12 @@ bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev_io, SPDK_BDEV_IO_TYPE_READ, desc, channel,
+	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 	
 	if (copy_opts) {
-		bdev_io_copy_ext_io_opts(bdev_io);
+		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
 	bdev_io_submit(bdev_io);
@@ -4311,12 +4317,12 @@ bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc, channel,
+	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
 	if (copy_opts) {
-		bdev_io_copy_ext_io_opts(bdev_io);
+		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
 	bdev_io_submit(bdev_io);
@@ -4461,12 +4467,12 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc, channel,
+	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 	
 	if (copy_opts) {
-		bdev_io_copy_ext_io_opts(bdev_io);
+		bdev_io_copy_ext_io_opts(bdev_io, md_buf);
 	}
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE)) {
@@ -4542,8 +4548,8 @@ bdev_compare_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 		return -ENOMEM;
 	}
 
-	bdev_io->iovs[0].iov_base = buf;
-	bdev_io->iovs[0].iov_len = num_blocks * bdev->blocklen;
+	bdev_io->iov.iov_base = buf;
+	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
 	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
@@ -4884,7 +4890,7 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 			 channel, NULL, 0, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, opts);
 	if (copy_opts) {
-		bdev_io_copy_ext_io_opts(bdev_io);
+		bdev_io_copy_ext_io_opts(bdev_io, NULL);
 	}
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_WRITE_ZEROES)) {
