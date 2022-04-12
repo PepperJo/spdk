@@ -93,6 +93,7 @@ struct spdk_nvmf_request {
 	struct spdk_poller		*poller;
 	struct spdk_bdev_io		*zcopy_bdev_io; /* Contains the bdev_io when using ZCOPY */
 	enum spdk_nvmf_zcopy_phase	zcopy_phase;
+	struct spdk_bdev_ext_io_opts 	bdev_io_opts;
 
 	TAILQ_ENTRY(spdk_nvmf_request)	link;
 };
