@@ -5975,6 +5975,12 @@ bdev_nvme_no_pi_readv(struct nvme_bdev_io *bio, struct iovec *iov, int iovcnt,
 	return rc;
 }
 
+static uint32_t
+bdev_flags_to_nvme_flags(uint64_t io_flags)
+{
+	return io_flags & SPDK_BDEV_IO_FLAG_FUA ? SPDK_NVME_IO_FLAGS_FORCE_UNIT_ACCESS : 0;
+}
+
 static int
 bdev_nvme_readv(struct nvme_bdev_io *bio, struct iovec *iov, int iovcnt,
 		void *md, uint64_t lba_count, uint64_t lba, uint32_t flags,
@@ -5996,7 +6002,7 @@ bdev_nvme_readv(struct nvme_bdev_io *bio, struct iovec *iov, int iovcnt,
 		bio->ext_opts.size = sizeof(struct spdk_nvme_ns_cmd_ext_io_opts);
 		bio->ext_opts.memory_domain = ext_opts->memory_domain;
 		bio->ext_opts.memory_domain_ctx = ext_opts->memory_domain_ctx;
-		bio->ext_opts.io_flags = flags;
+		bio->ext_opts.io_flags = flags | bdev_flags_to_nvme_flags(ext_opts->io_flags);
 		bio->ext_opts.metadata = md;
 
 		rc = spdk_nvme_ns_cmd_readv_ext(ns, qpair, lba, lba_count,
@@ -6043,7 +6049,7 @@ bdev_nvme_writev(struct nvme_bdev_io *bio, struct iovec *iov, int iovcnt,
 		bio->ext_opts.size = sizeof(struct spdk_nvme_ns_cmd_ext_io_opts);
 		bio->ext_opts.memory_domain = ext_opts->memory_domain;
 		bio->ext_opts.memory_domain_ctx = ext_opts->memory_domain_ctx;
-		bio->ext_opts.io_flags = flags;
+		bio->ext_opts.io_flags = flags | bdev_flags_to_nvme_flags(ext_opts->io_flags);
 		bio->ext_opts.metadata = md;
 
 		rc = spdk_nvme_ns_cmd_writev_ext(ns, qpair, lba, lba_count,
