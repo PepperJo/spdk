@@ -216,6 +216,12 @@ quick_test_complete(struct spdk_bdev_io *bdev_io, bool success, void *arg)
 	wake_ut_thread();
 }
 
+static uint64_t
+bdev_bytes_to_blocks(struct spdk_bdev *bdev, uint64_t bytes)
+{
+	return bytes / spdk_bdev_get_block_size(bdev);
+}
+
 static void
 __blockdev_write(void *arg)
 {
@@ -257,10 +263,12 @@ __blockdev_compare_and_write(void *arg)
 {
 	struct bdevio_request *req = arg;
 	struct io_target *target = req->target;
+	struct spdk_bdev *bdev = target->bdev;
 	int rc;
 
 	rc = spdk_bdev_comparev_and_writev_blocks(target->bdev_desc, target->ch, req->iov, req->iovcnt,
-			req->fused_iov, req->fused_iovcnt, req->offset, req->data_len, quick_test_complete, NULL);
+			req->fused_iov, req->fused_iovcnt, bdev_bytes_to_blocks(bdev, req->offset),
+			bdev_bytes_to_blocks(bdev, req->data_len), quick_test_complete, NULL);
 
 	if (rc) {
 		g_completion_success = false;
@@ -423,18 +431,6 @@ blockdev_write_read_data_match(char *rx_buf, char *tx_buf, int data_length)
 	return rc;
 }
 
-static bool
-blockdev_io_valid_blocks(struct spdk_bdev *bdev, uint64_t data_length)
-{
-	if (data_length < spdk_bdev_get_block_size(bdev) ||
-	    data_length % spdk_bdev_get_block_size(bdev) ||
-	    data_length / spdk_bdev_get_block_size(bdev) > spdk_bdev_get_num_blocks(bdev)) {
-		return false;
-	}
-
-	return true;
-}
-
 static void
 blockdev_write_read(uint32_t data_length, uint32_t iov_len, int pattern, uint64_t offset,
 		    int expected_rc, bool write_zeroes)
@@ -445,10 +441,6 @@ blockdev_write_read(uint32_t data_length, uint32_t iov_len, int pattern, uint64_
 	int	rc;
 
 	target = g_current_io_target;
-
-	if (!blockdev_io_valid_blocks(target->bdev, data_length)) {
-		return;
-	}
 
 	if (!write_zeroes) {
 		initialize_buffer(&tx_buf, pattern, data_length);
@@ -494,10 +486,6 @@ blockdev_compare_and_write(uint32_t data_length, uint32_t iov_len, uint64_t offs
 	int	rc;
 
 	target = g_current_io_target;
-
-	if (!blockdev_io_valid_blocks(target->bdev, data_length)) {
-		return;
-	}
 
 	initialize_buffer(&tx_buf, 0xAA, data_length);
 	initialize_buffer(&rx_buf, 0, data_length);
@@ -655,9 +643,12 @@ blockdev_comparev_and_writev(void)
 {
 	uint32_t data_length, iov_len;
 	uint64_t offset;
+	struct io_target *target = g_current_io_target;
+	struct spdk_bdev *bdev = target->bdev;
 
-	data_length = 1;
-	iov_len = 1;
+	/* Data size = acwu size */
+	data_length = spdk_bdev_get_block_size(bdev) * spdk_bdev_get_acwu(bdev);
+	iov_len = data_length;
 	CU_ASSERT_TRUE(data_length < BUFFER_SIZE);
 	offset = 0;
 

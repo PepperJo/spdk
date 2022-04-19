@@ -54,7 +54,7 @@ function setup_bdev_conf() {
 	RPC
 	if [[ $(uname -s) != "FreeBSD" ]]; then
 		dd if=/dev/zero of="$SPDK_TEST_STORAGE/aiofile" bs=2048 count=5000
-		"$rpc_py" bdev_aio_create "$SPDK_TEST_STORAGE/aiofile" AIO0 2048
+		"$rpc_py" bdev_aio_create "$SPDK_TEST_STORAGE/aiofile" AIO0 512
 	fi
 }
 
