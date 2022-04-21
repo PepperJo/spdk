@@ -904,7 +904,7 @@ blockdev_write_read_invalid_size(void)
 	 * of write and read for all blockdevs is < 0 */
 	expected_rc = -1;
 
-	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0);
+	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0, 0, 0);
 }
 
 static void
@@ -931,10 +931,10 @@ blockdev_write_read_offset_plus_nbytes_equals_bdev_size(void)
 	initialize_buffer(&tx_buf, 0xA3, block_size);
 	initialize_buffer(&rx_buf, 0, block_size);
 
-	blockdev_write(target, tx_buf, offset, block_size, 0);
+	blockdev_write(target, tx_buf, offset, block_size, 0, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
-	blockdev_read(target, rx_buf, offset, block_size, 0);
+	blockdev_read(target, rx_buf, offset, block_size, 0, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
 	rc = blockdev_write_read_data_match(rx_buf, tx_buf, block_size);
@@ -970,10 +970,10 @@ blockdev_write_read_offset_plus_nbytes_gt_bdev_size(void)
 	initialize_buffer(&tx_buf, pattern, data_length);
 	initialize_buffer(&rx_buf, 0, data_length);
 
-	blockdev_write(target, tx_buf, offset, data_length, 0);
+	blockdev_write(target, tx_buf, offset, data_length, 0, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, false);
 
-	blockdev_read(target, rx_buf, offset, data_length, 0);
+	blockdev_read(target, rx_buf, offset, data_length, 0, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, false);
 }
 
@@ -995,7 +995,7 @@ blockdev_write_read_max_offset(void)
 	 * of write and read for all blockdevs is < 0 */
 	expected_rc = -1;
 
-	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0);
+	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0, 0, 0);
 }
 
 static void
@@ -1016,7 +1016,7 @@ blockdev_overlapped_write_read_8k(void)
 	expected_rc = 0;
 	/* Assert the write by comparing it with values read
 	 * from the same offset for each blockdev */
-	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0);
+	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0, 0, 0);
 
 	/* Overwrite the pattern 0xbb of size 8K on an address offset overlapping
 	 * with the address written above and assert the new value in
@@ -1027,7 +1027,7 @@ blockdev_overlapped_write_read_8k(void)
 	offset = 4096;
 	/* Assert the write by comparing it with values read
 	 * from the overlapped offset for each blockdev */
-	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0);
+	blockdev_write_read(data_length, 0, pattern, offset, expected_rc, 0, 0, 0);
 }
 
 static void
