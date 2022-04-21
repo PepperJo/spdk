@@ -390,7 +390,7 @@ _blockdev_compare_and_write(struct io_target *target, char *cmp_buf, char *write
 	sgl_chop_fused_buffer(&req, iov_len);
 	req.opts.size = sizeof(req.opts);
 	req.opts.io_flags = cmp_io_flags;
-	req.opts.size = sizeof(req.fused_opts);
+	req.fused_opts.size = sizeof(req.fused_opts);
 	req.fused_opts.io_flags = write_io_flags;
 
 	g_completion_success = false;
