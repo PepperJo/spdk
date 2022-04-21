@@ -939,10 +939,10 @@ blockdev_write_read_offset_plus_nbytes_equals_bdev_size(void)
 	initialize_buffer(&tx_buf, 0xA3, block_size);
 	initialize_buffer(&rx_buf, 0, block_size);
 
-	blockdev_write(target, tx_buf, offset, block_size, 0, 0, 0);
+	blockdev_write(target, tx_buf, offset, block_size, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
-	blockdev_read(target, rx_buf, offset, block_size, 0, 0, 0);
+	blockdev_read(target, rx_buf, offset, block_size, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
 	rc = blockdev_write_read_data_match(rx_buf, tx_buf, block_size);
@@ -978,10 +978,10 @@ blockdev_write_read_offset_plus_nbytes_gt_bdev_size(void)
 	initialize_buffer(&tx_buf, pattern, data_length);
 	initialize_buffer(&rx_buf, 0, data_length);
 
-	blockdev_write(target, tx_buf, offset, data_length, 0, 0, 0);
+	blockdev_write(target, tx_buf, offset, data_length, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, false);
 
-	blockdev_read(target, rx_buf, offset, data_length, 0, 0, 0);
+	blockdev_read(target, rx_buf, offset, data_length, 0, 0);
 	CU_ASSERT_EQUAL(g_completion_success, false);
 }
 
