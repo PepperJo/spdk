@@ -77,6 +77,7 @@ struct bdevio_request {
 	int fused_iovcnt;
 	struct io_target *target;
 	struct spdk_bdev_ext_io_opts opts;
+	struct spdk_bdev_ext_io_opts fused_opts;
 };
 
 struct io_target *g_io_targets = NULL;
@@ -288,7 +289,7 @@ __blockdev_compare_and_write(void *arg)
 							      req->iovcnt, req->fused_iov, req->fused_iovcnt,
 							      bdev_bytes_to_blocks(bdev, req->offset),
 							      bdev_bytes_to_blocks(bdev, req->data_len),
-							      quick_test_complete, NULL, &req->opts);
+							      quick_test_complete, NULL, &req->opts, &req->fused_opts);
 	} else {
 		rc = spdk_bdev_comparev_and_writev_blocks(target->bdev_desc, target->ch, req->iov,
 							  req->iovcnt, req->fused_iov, req->fused_iovcnt,
@@ -375,8 +376,8 @@ blockdev_write(struct io_target *target, char *tx_buf,
 }
 
 static void
-_blockdev_compare_and_write(struct io_target *target, char *cmp_buf, char *write_buf,
-			    uint64_t offset, int data_len, int iov_len, int io_flags)
+_blockdev_compare_and_write(struct io_target *target, char *cmp_buf, char *write_buf, uint64_t offset, 
+			    int data_len, int iov_len, int cmp_io_flags, int write_io_flags)
 {
 	struct bdevio_request req = {};
 
@@ -388,7 +389,9 @@ _blockdev_compare_and_write(struct io_target *target, char *cmp_buf, char *write
 	sgl_chop_buffer(&req, iov_len);
 	sgl_chop_fused_buffer(&req, iov_len);
 	req.opts.size = sizeof(req.opts);
-	req.opts.io_flags = io_flags;
+	req.opts.io_flags = cmp_io_flags;
+	req.opts.size = sizeof(req.fused_opts);
+	req.fused_opts.io_flags = write_io_flags;
 
 	g_completion_success = false;
 
@@ -520,7 +523,8 @@ blockdev_write_read(uint32_t data_length, uint32_t iov_len, int pattern, uint64_
 }
 
 static void
-blockdev_compare_and_write(uint32_t data_length, uint32_t iov_len, uint64_t offset, int io_flags)
+blockdev_compare_and_write(uint32_t data_length, uint32_t iov_len, uint64_t offset,
+			   int cmp_io_flags, int write_io_flags)
 {
 	struct io_target *target;
 	char	*tx_buf = NULL;
@@ -537,10 +541,12 @@ blockdev_compare_and_write(uint32_t data_length, uint32_t iov_len, uint64_t offs
 	blockdev_write(target, tx_buf, offset, data_length, iov_len, 0);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
-	_blockdev_compare_and_write(target, tx_buf, write_buf, offset, data_length, iov_len, io_flags);
+	_blockdev_compare_and_write(target, tx_buf, write_buf, offset, data_length, 
+				    iov_len, cmp_io_flags, write_io_flags);
 	CU_ASSERT_EQUAL(g_completion_success, true);
 
-	_blockdev_compare_and_write(target, tx_buf, write_buf, offset, data_length, iov_len, io_flags);
+	_blockdev_compare_and_write(target, tx_buf, write_buf, offset, data_length,
+				    iov_len, cmp_io_flags, write_io_flags);
 	CU_ASSERT_EQUAL(g_completion_success, false);
 
 	blockdev_read(target, rx_buf, offset, data_length, iov_len, 0);
@@ -695,7 +701,7 @@ blockdev_comparev_and_writev(void)
 	CU_ASSERT_TRUE(data_length < BUFFER_SIZE);
 	offset = 0;
 
-	blockdev_compare_and_write(data_length, iov_len, offset, 0);
+	blockdev_compare_and_write(data_length, iov_len, offset, 0, 0);
 }
 
 static void
@@ -884,7 +890,9 @@ blockdev_comparev_and_writev_io_flags(void)
 	CU_ASSERT_TRUE(data_length < BUFFER_SIZE);
 	offset = 0;
 
-	blockdev_compare_and_write(data_length, iov_len, offset, SPDK_BDEV_IO_FLAG_FUA);
+	blockdev_compare_and_write(data_length, iov_len, offset, SPDK_BDEV_IO_FLAG_FUA, 0);
+	blockdev_compare_and_write(data_length, iov_len, offset, 0, SPDK_BDEV_IO_FLAG_FUA);
+	blockdev_compare_and_write(data_length, iov_len, offset, SPDK_BDEV_IO_FLAG_FUA, SPDK_BDEV_IO_FLAG_FUA);
 }
 
 static void
