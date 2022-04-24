@@ -278,6 +278,7 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 		}
 	}
 
+	CU_ASSERT(bdev_io->internal.ext_opts == bdev_io->u.bdev.opts);
 	if (expected_io->copy_opts) {
 		// opts are not NULL so they should have been copied
 		CU_ASSERT(expected_io->ext_io_opts && expected_io->ext_io_opts != bdev_io->internal.ext_opts);
