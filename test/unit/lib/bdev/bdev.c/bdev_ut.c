@@ -279,10 +279,13 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 	}
 
 	if (expected_io->copy_opts) {
-		// opts are not NULL so it should have been copied
-		CU_ASSERT(expected_io->ext_io_opts && expected_io->ext_io_opts != bdev_io->u.bdev.ext_opts);
-		// passed opts was NULL so we expect bdev_io opts to be NULL
-		CU_ASSERT(expected_io->ext_io_opts == NULL && bdev_io->u.bdev.ext_opts == NULL);
+		if (expected_io->ext_io_opts) {
+			// opts are not NULL so it should have been copied
+			CU_ASSERT(expected_io->ext_io_opts != bdev_io->u.bdev.ext_opts);
+		} else {
+			// passed opts was NULL so we expect bdev_io opts to be NULL
+			CU_ASSERT(bdev_io->u.bdev.ext_opts == NULL);
+		}
 	} else {
 		// opts were not copied so they should be equal
 		CU_ASSERT(expected_io->ext_io_opts == bdev_io->u.bdev.ext_opts);
