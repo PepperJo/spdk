@@ -278,20 +278,19 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 		}
 	}
 
-	CU_ASSERT(bdev_io->internal.ext_opts == bdev_io->u.bdev.ext_opts);
 	if (expected_io->copy_opts) {
-		// opts are not NULL so they should have been copied
-		CU_ASSERT(expected_io->ext_io_opts && expected_io->ext_io_opts != bdev_io->internal.ext_opts);
+		// opts are not NULL so it should have been copied
+		CU_ASSERT(expected_io->ext_io_opts && expected_io->ext_io_opts != bdev_io->u.bdev.ext_opts);
 		// passed opts was NULL so we expect bdev_io opts to be NULL
-		CU_ASSERT(expected_io->ext_io_opts == NULL && bdev_io->internal.ext_opts == NULL);
+		CU_ASSERT(expected_io->ext_io_opts == NULL && bdev_io->u.bdev.ext_opts == NULL);
 	} else {
 		// opts were not copied so they should be equal
-		CU_ASSERT(expected_io->ext_io_opts == bdev_io->internal.ext_opts);
+		CU_ASSERT(expected_io->ext_io_opts == bdev_io->u.bdev.ext_opts);
 	}
 
 	if (expected_io->ext_io_opts) {
 		// check that no members have been modified (except metadata on split)
-		CU_ASSERT(expected_io->io_flags == bdev_io->internal.ext_opts->io_flags);
+		CU_ASSERT(expected_io->io_flags == bdev_io->u.bdev.ext_opts->io_flags);
 	}
 
 	if (expected_io->length == 0) {
