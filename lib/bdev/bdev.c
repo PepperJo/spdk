@@ -4152,35 +4152,6 @@ _bdev_io_check_md_buf(const struct iovec *iovs, const void *md_buf)
 	return _is_buf_allocated(iovs) == (md_buf != NULL);
 }
 
-<<<<<<< HEAD
-=======
-static inline void
-_bdev_io_copy_ext_opts(struct spdk_bdev_io *bdev_io, struct spdk_bdev_ext_io_opts *opts)
-{
-	struct spdk_bdev_ext_io_opts *opts_copy = &bdev_io->internal.ext_opts_copy;
-
-	memcpy(opts_copy, opts, opts->size);
-	bdev_io->internal.ext_opts_copy.metadata = bdev_io->u.bdev.md_buf;
-	/* Save pointer to the copied ext_opts which will be used by bdev modules */
-	bdev_io->u.bdev.ext_opts = opts_copy;
-}
-
-static inline void
-_bdev_io_ext_use_bounce_buffer(struct spdk_bdev_io *bdev_io)
-{
-	/* bdev doesn't support memory domains, thereby buffers in this IO request can't
-	 * be accessed directly. It is needed to allocate buffers before issuing IO operation.
-	 * For write operation we need to pull buffers from memory domain before submitting IO.
-	 * Once read operation completes, we need to use memory_domain push functionality to
-	 * update data in original memory domain IO buffer
-	 * This IO request will go through a regular IO flow, so clear memory domains pointers in
-	 * the copied ext_opts */
-	bdev_io->internal.ext_opts_copy.memory_domain = NULL;
-	bdev_io->internal.ext_opts_copy.memory_domain_ctx = NULL;
-	_bdev_memory_domain_io_get_buf(bdev_io, _bdev_memory_domain_get_io_cb,
-				       bdev_io->u.bdev.num_blocks * bdev_io->bdev->blocklen);
-}
-
 static void
 bdev_io_init_ext(struct spdk_bdev *bdev, struct spdk_bdev_io *bdev_io,
 		 uint8_t type, struct spdk_bdev_desc *desc,
@@ -4203,7 +4174,6 @@ bdev_io_init_ext(struct spdk_bdev *bdev, struct spdk_bdev_io *bdev_io,
 	bdev_io->u.bdev.ext_opts = opts;
 }
 
->>>>>>> 0b996550d (bdev: add io flags)
 static int
 bdev_read_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch, void *buf,
 			 void *md_buf, uint64_t offset_blocks, uint64_t num_blocks,
@@ -4353,7 +4323,6 @@ spdk_bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chann
 					 num_blocks, cb, cb_arg, NULL, false);
 }
 
-<<<<<<< HEAD
 static inline bool
 _bdev_io_check_opts(struct spdk_bdev_ext_io_opts *opts, struct iovec *iov)
 {
@@ -4367,15 +4336,6 @@ _bdev_io_check_opts(struct spdk_bdev_ext_io_opts *opts, struct iovec *iov)
 	       opts->size <= sizeof(*opts) &&
 	       /* When memory domain is used, the user must provide data buffers */
 	       (!opts->memory_domain || (iov && iov[0].iov_base));
-=======
-static bool
-bdev_ext_io_opts_valid(struct spdk_bdev_ext_io_opts *opts)
-{
-	if (spdk_unlikely(!opts->size || opts->size > sizeof(struct spdk_bdev_ext_io_opts))) {
-		return false;
-	}
-	return true;
->>>>>>> 0b996550d (bdev: add io flags)
 }
 
 int
@@ -4388,15 +4348,7 @@ spdk_bdev_readv_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 	void *md = NULL;
 
 	if (opts) {
-<<<<<<< HEAD
 		if (spdk_unlikely(!_bdev_io_check_opts(opts, iov))) {
-=======
-		if (!bdev_ext_io_opts_valid(opts)) {
-			return -EINVAL;
-		}
-		if (spdk_unlikely(opts->memory_domain && !(iov && iov[0].iov_base))) {
-			/* When memory domain is used, the user must provide data buffers */
->>>>>>> 0b996550d (bdev: add io flags)
 			return -EINVAL;
 		}
 		md = opts->metadata;
@@ -4566,15 +4518,7 @@ spdk_bdev_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 	void *md = NULL;
 
 	if (opts) {
-<<<<<<< HEAD
 		if (spdk_unlikely(!_bdev_io_check_opts(opts, iov))) {
-=======
-		if (!bdev_ext_io_opts_valid(opts)) {
-			return -EINVAL;
-		}
-		if (spdk_unlikely(opts->memory_domain && !(iov && iov[0].iov_base))) {
-			/* When memory domain is used, the user must provide data buffers */
->>>>>>> 0b996550d (bdev: add io flags)
 			return -EINVAL;
 		}
 		md = opts->metadata;

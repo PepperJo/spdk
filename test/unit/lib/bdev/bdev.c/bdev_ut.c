@@ -119,6 +119,7 @@ struct ut_expected_io {
 	struct iovec			iov[BDEV_IO_NUM_CHILD_IOV];
 	void				*md_buf;
 	struct spdk_bdev_ext_io_opts	*ext_io_opts;
+	bool				copy_opts;
 	uint64_t			io_flags;
 	TAILQ_ENTRY(ut_expected_io)	link;
 };
@@ -277,8 +278,18 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 		}
 	}
 
-	if (expected_io->ext_io_opts) {
+	if (expected_io->copy_opts) {
+		// opts are not NULL so they should have been copied
+		CU_ASSERT(expected_io->ext_io_opts && expected_io->ext_io_opts != bdev_io->internal.ext_opts);
+		// passed opts was NULL so we expect bdev_io opts to be NULL
+		CU_ASSERT(expected_io->ext_io_opts == NULL && bdev_io->internal.ext_opts == NULL);
+	} else {
+		// opts were not copied so they should be equal
 		CU_ASSERT(expected_io->ext_io_opts == bdev_io->internal.ext_opts);
+	}
+
+	if (expected_io->ext_io_opts) {
+		// check that no members have been modified (except metadata on split)
 		CU_ASSERT(expected_io->io_flags == bdev_io->internal.ext_opts->io_flags);
 	}
 
@@ -5335,12 +5346,16 @@ bdev_io_ext(void)
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 14, 2, 1);
 	expected_io->md_buf = ext_io_opts.metadata;
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
+	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	ut_expected_io_set_iov(expected_io, 0, (void *)0xF000, 2 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 16, 6, 1);
 	expected_io->md_buf = ext_io_opts.metadata + 2 * 8;
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
+	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	ut_expected_io_set_iov(expected_io, 0, (void *)(0xF000 + 2 * 512), 6 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
@@ -5358,12 +5373,16 @@ bdev_io_ext(void)
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 14, 2, 1);
 	expected_io->md_buf = ext_io_opts.metadata;
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
+	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	ut_expected_io_set_iov(expected_io, 0, (void *)0xF000, 2 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 16, 6, 1);
 	expected_io->md_buf = ext_io_opts.metadata + 2 * 8;
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
+	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	ut_expected_io_set_iov(expected_io, 0, (void *)(0xF000 + 2 * 512), 6 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
@@ -5384,6 +5403,7 @@ bdev_io_ext(void)
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 32, 14, 1);
 	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
 	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
@@ -5399,9 +5419,26 @@ bdev_io_ext(void)
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 32, 14, 1);
 	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
 	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
+
+	CU_ASSERT(rc == 0);
+	CU_ASSERT(g_memory_domain_pull_data_called == true);
+	CU_ASSERT(g_io_done == false);
+	CU_ASSERT(g_bdev_ut_channel->outstanding_io_count == 1);
+	stub_complete_io(1);
+	CU_ASSERT(g_io_done == true);
+
+	g_io_done = false;
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 32, 14, 0);
+	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
+	expected_io->ext_io_opts = &ext_io_opts;
+	expected_io->copy_opts = true;
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
 
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(g_memory_domain_pull_data_called == true);
