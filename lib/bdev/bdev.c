@@ -4152,8 +4152,8 @@ _bdev_io_check_md_buf(const struct iovec *iovs, const void *md_buf)
 	return _is_buf_allocated(iovs) == (md_buf != NULL);
 }
 
-static void
-bdev_io_init_ext(struct spdk_bdev *bdev, struct spdk_bdev_io *bdev_io,
+static inline void
+_bdev_io_init_ext(struct spdk_bdev *bdev, struct spdk_bdev_io *bdev_io,
 		 uint8_t type, struct spdk_bdev_desc *desc,
 		 struct spdk_bdev_channel *channel,
 		 struct iovec *iov, int iovcnt, void *md_buf,
@@ -4195,7 +4195,7 @@ bdev_read_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 	bdev_io->iov.iov_base = buf;
 	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
@@ -4291,7 +4291,7 @@ bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc, channel,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_READ, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
@@ -4386,7 +4386,7 @@ bdev_write_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 	bdev_io->iov.iov_base = buf;
 	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
@@ -4459,7 +4459,7 @@ bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc, channel,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
@@ -4608,7 +4608,7 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc, channel,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc, channel,
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
@@ -4701,7 +4701,7 @@ bdev_compare_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 	bdev_io->iov.iov_base = buf;
 	bdev_io->iov.iov_len = num_blocks * bdev->blocklen;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE, desc,
 			 channel, &bdev_io->iov, 1, md_buf,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
@@ -4882,7 +4882,7 @@ bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_chan
 	bdev_io->u.bdev.fused_ext_opts = write_opts;
 	bdev_io->internal.fused_ext_opts = write_opts;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE_AND_WRITE,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_COMPARE_AND_WRITE,
 			 desc, channel, compare_iov, compare_iovcnt, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, compare_opts);
 
@@ -4971,7 +4971,7 @@ spdk_bdev_zcopy_start(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	bdev_io->u.bdev.zcopy.commit = 0;
 	bdev_io->u.bdev.zcopy.start = 1;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_ZCOPY, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_ZCOPY, desc,
 			 channel, iov, iovcnt, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
@@ -5038,7 +5038,7 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE_ZEROES, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_WRITE_ZEROES, desc,
 			 channel, NULL, 0, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, opts);
 
@@ -5146,7 +5146,7 @@ spdk_bdev_unmap_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	bdev_io->iov.iov_base = NULL;
 	bdev_io->iov.iov_len = 0;
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_UNMAP, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_UNMAP, desc,
 			 channel, &bdev_io->iov, 1, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
@@ -5191,7 +5191,7 @@ spdk_bdev_flush_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		return -ENOMEM;
 	}
 
-	bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_FLUSH, desc,
+	_bdev_io_init_ext(bdev, bdev_io, SPDK_BDEV_IO_TYPE_FLUSH, desc,
 			 channel, NULL, 0, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, NULL);
 
