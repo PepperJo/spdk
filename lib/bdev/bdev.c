@@ -4667,7 +4667,7 @@ int spdk_bdev_comparev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 	void *md = NULL;
 
 	if (opts) {
-		if (!bdev_ext_io_opts_valid(opts)) {
+		if (spdk_unlikely(!_bdev_io_check_opts(opts, iov))) {
 			return -EINVAL;
 		}
 		md = opts->metadata;
@@ -4917,15 +4917,16 @@ spdk_bdev_comparev_and_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spd
 {
 	/** we currently don't support metadata for cmp & write */
 	if (compare_opts) {
-		if (!bdev_ext_io_opts_valid(compare_opts)) {
+		if (spdk_unlikely(!_bdev_io_check_opts(compare_opts, compare_iov))) {
 			return -EINVAL;
 		}
 		if (compare_opts->metadata) {
 			return -ENOTSUP;
 		}
 	}
+	}
 	if (write_opts) {
-		if (!bdev_ext_io_opts_valid(write_opts)) {
+		if (spdk_unlikely(!_bdev_io_check_opts(write_opts, write_iov))) {
 			return -EINVAL;
 		}
 		if (write_opts->metadata) {
