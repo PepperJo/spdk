@@ -282,6 +282,9 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 		if (expected_io->ext_io_opts) {
 			// opts are not NULL so it should have been copied
 			CU_ASSERT(expected_io->ext_io_opts != bdev_io->u.bdev.ext_opts);
+			CU_ASSERT(bdev_io->u.bdev.ext_opts == &bdev_io->internal.ext_opts_copy);
+			// internal opts always points to opts passed
+			CU_ASSERT(expected_io->ext_io_opts == bdev_io->internal.ext_opts);
 		} else {
 			// passed opts was NULL so we expect bdev_io opts to be NULL
 			CU_ASSERT(bdev_io->u.bdev.ext_opts == NULL);
@@ -292,7 +295,7 @@ stub_submit_request(struct spdk_io_channel *_ch, struct spdk_bdev_io *bdev_io)
 	}
 
 	if (expected_io->ext_io_opts) {
-		// check that no members have been modified (except metadata on split)
+		// check that no members have been modified
 		CU_ASSERT(expected_io->io_flags == bdev_io->u.bdev.ext_opts->io_flags);
 	}
 
