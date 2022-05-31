@@ -5539,14 +5539,12 @@ bdev_io_ext_split(void)
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	expected_io->copy_opts = true;
-	ut_expected_io_set_iov(expected_io, 0, (void *)0xF000, 2 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 16, 6, 1);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	expected_io->copy_opts = true;
-	ut_expected_io_set_iov(expected_io, 0, (void *)(0xF000 + 2 * 512), 6 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 14, 8, io_done, NULL, &ext_io_opts);
