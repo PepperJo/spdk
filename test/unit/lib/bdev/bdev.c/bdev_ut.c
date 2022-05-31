@@ -5244,7 +5244,7 @@ bdev_io_ext(void)
 	stub_complete_io(1);
 	CU_ASSERT(g_io_done == true);
 
-	/* Test ext_io_opts NULL */
+	/* Test 2, ext_io_opts NULL */
 	g_io_done = false;
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 32, 14, 1);
 	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
@@ -5296,7 +5296,7 @@ bdev_io_ext(void)
 	stub_complete_io(1);
 	CU_ASSERT(g_io_done == true);
 
-	/* Test 2, invalid ext_opts size */
+	/* Test 3, invalid ext_opts size */
 	ext_io_opts.size = 0;
 	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
@@ -5317,20 +5317,25 @@ bdev_io_ext(void)
 	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
 
-	/** write zeroes does not allow metadata */
+	ext_io_opts.size = offsetof(struct spdk_bdev_ext_io_opts, metadata) +
+			   sizeof(ext_io_opts.metadata) - 1;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
+	CU_ASSERT(rc == -EINVAL);
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
+	CU_ASSERT(rc == -EINVAL);
+	rc = spdk_bdev_comparev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
+	CU_ASSERT(rc == -EINVAL);
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
+	CU_ASSERT(rc == -EINVAL);
+
+
+	/* Test 4, write zeroes does not allow metadata */
 	ext_io_opts.size = sizeof(ext_io_opts);
 	ext_io_opts.metadata = (void *)0xFF000000;
 	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == -EINVAL);
 
-	ext_io_opts.size = offsetof(struct spdk_bdev_ext_io_opts, metadata) +
-			   sizeof(ext_io_opts.metadata) - 1;
-	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
-	CU_ASSERT(rc != 0);
-	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 32, 14, io_done, NULL, &ext_io_opts);
-	CU_ASSERT(rc != 0);
-
-	/* Test 3, Check that IO request with ext_opts and metadata is split correctly
+	/* Test 5, Check that IO request with ext_opts and metadata is split correctly
 	 * Offset 14, length 8, payload 0xF000
 	 *  Child - Offset 14, length 2, payload 0xF000
 	 *  Child - Offset 16, length 6, payload 0xF000 + 2 * 512
@@ -5401,8 +5406,8 @@ bdev_io_ext(void)
 	CU_ASSERT(g_io_done == true);
 	CU_ASSERT(g_bdev_ut_channel->outstanding_io_count == 0);
 
-	/* Test 4, Verify data pull/push
-	 * bdev doens't support memory domains, so buffers from bdev memory pool will be used */
+	/* Test 6, Verify data pull/push
+	 * bdev doesn't support memory domains, so buffers from bdev memory pool will be used */
 	ext_io_opts.memory_domain = (struct spdk_memory_domain *)0xdeadbeef;
 
 	g_io_done = false;
@@ -5437,21 +5442,9 @@ bdev_io_ext(void)
 	stub_complete_io(1);
 	CU_ASSERT(g_io_done == true);
 
-	g_io_done = false;
-	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 32, 14, 0);
-	ut_expected_io_set_iov(expected_io, 0, iov.iov_base, iov.iov_len);
-	expected_io->ext_io_opts = &ext_io_opts;
-	expected_io->copy_opts = true;
-	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
-
+	/* Test 7, write zeroes does not support memory domain */
 	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 32, 14, io_done, NULL, &ext_io_opts);
-
-	CU_ASSERT(rc == 0);
-	CU_ASSERT(g_memory_domain_pull_data_called == true);
-	CU_ASSERT(g_io_done == false);
-	CU_ASSERT(g_bdev_ut_channel->outstanding_io_count == 1);
-	stub_complete_io(1);
-	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(rc != 0);
 
 	spdk_put_io_channel(io_ch);
 	spdk_bdev_close(desc);
