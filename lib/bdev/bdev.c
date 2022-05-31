@@ -5027,6 +5027,7 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 
 	assert(bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_WRITE));
 	assert(_bdev_get_block_size_with_md(bdev) <= ZERO_BUFFER_SIZE);
+	assert(!copy_opts);
 	bdev_io->u.bdev.split_remaining_num_blocks = num_blocks;
 	bdev_io->u.bdev.split_current_offset_blocks = offset_blocks;
 	bdev_write_zero_buffer_next(bdev_io);
@@ -6871,7 +6872,8 @@ bdev_write_zero_buffer_next(void *_bdev_io)
 				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
 				       &bdev_io->iov, 1, md_buf,
 				       bdev_io->u.bdev.split_current_offset_blocks, num_blocks,
-				       bdev_write_zero_buffer_done, bdev_io);
+				       bdev_write_zero_buffer_done, bdev_io,
+				       bdev_io->u.bdev.ext_opts, false);
 
 	if (rc == 0) {
 		bdev_io->u.bdev.split_remaining_num_blocks -= num_blocks;
