@@ -4577,7 +4577,7 @@ bdev_compare_do_read(void *_bdev_io)
 
 	rc = bdev_readv_blocks_with_md(bdev_io->internal.desc,
 				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
-				       &bdev_io->iov, 1, bdev_io->u.bdev.md_buf
+				       &bdev_io->iov, 1, bdev_io->u.bdev.md_buf,
 				       bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
 				       bdev_compare_do_read_done, bdev_io, bdev_io->u.bdev.ext_opts,
 				       false);
@@ -5065,7 +5065,7 @@ spdk_bdev_write_zeroes_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 {
 	/** users should not provide a metadata buffer */
 	if (opts) {
-		if (spdk_unlikely(!_bdev_io_check_opts(opts, iov))) {
+		if (spdk_unlikely(!_bdev_io_check_opts(opts, NULL))) {
 			return -EINVAL;
 		}
 		if (opts->metadata) {
@@ -6871,13 +6871,8 @@ bdev_write_zero_buffer_next(void *_bdev_io)
 				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
 				       &bdev_io->iov, 1, md_buf,
 				       bdev_io->u.bdev.split_current_offset_blocks, num_blocks,
-				       bdev_write_zero_buffer_done, bdev_io)
-
-	rc = bdev_write_blocks_with_md(bdev_io->internal.desc,
-				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
-				       g_bdev_mgr.zero_buffer, md_buf,
-				       bdev_io->u.bdev.split_current_offset_blocks, num_blocks,
 				       bdev_write_zero_buffer_done, bdev_io);
+
 	if (rc == 0) {
 		bdev_io->u.bdev.split_remaining_num_blocks -= num_blocks;
 		bdev_io->u.bdev.split_current_offset_blocks += num_blocks;
