@@ -3529,9 +3529,9 @@ bdev_compare_and_write(void)
 	CU_ASSERT_EQUAL(rc, -EINVAL);
 
 	compare_opts.size = offsetof(struct spdk_bdev_ext_io_opts, metadata) +
-			   sizeof(ext_io_opts.metadata) - 1;
+			   sizeof(compare_opts.metadata) - 1;
 	write_opts.size = offsetof(struct spdk_bdev_ext_io_opts, metadata) +
-			   sizeof(ext_io_opts.metadata) - 1;
+			   sizeof(write_opts.metadata) - 1;
 	rc = spdk_bdev_comparev_and_writev_blocks_ext(desc, ioch, &compare_iov, 1, &write_iov, 1,
 			offset, num_blocks, io_done, NULL, &compare_opts, NULL);
 	CU_ASSERT_EQUAL(rc, -EINVAL);
@@ -5362,7 +5362,6 @@ bdev_io_ext_invalid_opts(void)
 	struct spdk_io_channel *io_ch;
 	char io_buf[512];
 	struct iovec iov = { .iov_base = io_buf, .iov_len = 512 };
-	struct ut_expected_io *expected_io;
 	struct spdk_bdev_ext_io_opts ext_io_opts = {
 		.metadata = (void *)0xFF000000,
 		.size = sizeof(ext_io_opts),
@@ -5550,7 +5549,7 @@ bdev_io_ext_split(void)
 	ut_expected_io_set_iov(expected_io, 0, (void *)(0xF000 + 2 * 512), 6 * 512);
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
-	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, &iov, 1, 14, 8, io_done, NULL, &ext_io_opts);
+	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 14, 8, io_done, NULL, &ext_io_opts);
 	CU_ASSERT(rc == 0);
 	CU_ASSERT(g_io_done == false);
 
