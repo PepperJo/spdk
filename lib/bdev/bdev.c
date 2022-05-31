@@ -4575,10 +4575,12 @@ bdev_compare_do_read(void *_bdev_io)
 	bdev_io->iov.iov_base = NULL;
 	bdev_io->iov.iov_len = 0;
 
-	rc = spdk_bdev_readv_blocks_ext(bdev_io->internal.desc,
-				       spdk_io_channel_from_ctx(bdev_io->internal.ch), &bdev_io->iov, 1,
+	rc = bdev_readv_blocks_with_md(bdev_io->internal.desc,
+				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
+				       &bdev_io->iov, 1, bdev_io->u.bdev.md_buf
 				       bdev_io->u.bdev.offset_blocks, bdev_io->u.bdev.num_blocks,
-				       bdev_compare_do_read_done, bdev_io, bdev_io->u.bdev.ext_opts);
+				       bdev_compare_do_read_done, bdev_io, bdev_io->u.bdev.ext_opts,
+				       false);
 
 	if (rc == -ENOMEM) {
 		bdev_queue_io_wait_with_cb(bdev_io, bdev_compare_do_read);
@@ -4593,7 +4595,7 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 			     struct iovec *iov, int iovcnt, void *md_buf,
 			     uint64_t offset_blocks, uint64_t num_blocks,
 			     spdk_bdev_io_completion_cb cb, void *cb_arg,
-			     struct spdk_bdev_ext_io_opts *opts, bool copy_opts)
+			     struct spdk_bdev_ext_io_opts *opts)
 {
 	struct spdk_bdev *bdev = spdk_bdev_desc_get_bdev(desc);
 	struct spdk_bdev_io *bdev_io;
@@ -4612,21 +4614,8 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 			 iov, iovcnt, md_buf, offset_blocks, num_blocks,
 			 cb, cb_arg, opts);
 
-	if (opts) {
-		bool use_pull_push = opts->memory_domain && !desc->memory_domains_supported;
-
-		assert(opts->size <= sizeof(*opts));
-		if (copy_opts || use_pull_push) {
-			_bdev_io_copy_ext_opts(bdev_io, opts);
-			if (use_pull_push) {
-				_bdev_io_ext_use_bounce_buffer(bdev_io);
-				return 0;
-			}
-		}
-	}
-
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE)) {
-		bdev_io_submit(bdev_io);
+		_bdev_io_submit_ext(desc, bdev_io, opts, false);
 		return 0;
 	}
 
@@ -4642,7 +4631,7 @@ spdk_bdev_comparev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 			  spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
 	return bdev_comparev_blocks_with_md(desc, ch, iov, iovcnt, NULL, offset_blocks,
-					    num_blocks, cb, cb_arg, NULL, false);
+					    num_blocks, cb, cb_arg, NULL);
 }
 
 int
@@ -4656,7 +4645,7 @@ spdk_bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_ch
 	}
 
 	return bdev_comparev_blocks_with_md(desc, ch, iov, iovcnt, md_buf, offset_blocks,
-					    num_blocks, cb, cb_arg, NULL, false);
+					    num_blocks, cb, cb_arg, NULL);
 }
 
 int spdk_bdev_comparev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
@@ -4677,7 +4666,7 @@ int spdk_bdev_comparev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 	}
 
 	return bdev_comparev_blocks_with_md(desc, ch, iov, iovcnt, md, offset_blocks,
-					    num_blocks, cb, cb_arg, opts, false);
+					    num_blocks, cb, cb_arg, opts);
 }
 
 static int
@@ -4924,7 +4913,6 @@ spdk_bdev_comparev_and_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spd
 			return -ENOTSUP;
 		}
 	}
-	}
 	if (write_opts) {
 		if (spdk_unlikely(!_bdev_io_check_opts(write_opts, write_iov))) {
 			return -EINVAL;
@@ -5013,16 +5001,6 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 		return -EBADF;
 	}
 
-	/** users should not provide a metadata buffer */
-	if (opts) {
-		if (!bdev_ext_io_opts_valid(opts)) {
-			return -EINVAL;
-		}
-		if (opts->metadata) {
-			return -EINVAL;
-		}
-	}
-
 	if (!bdev_io_valid_blocks(bdev, offset_blocks, num_blocks)) {
 		return -EINVAL;
 	}
@@ -5042,21 +5020,8 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 			 channel, NULL, 0, NULL,
 			 offset_blocks, num_blocks, cb, cb_arg, opts);
 
-	if (opts) {
-		bool use_pull_push = opts->memory_domain && !desc->memory_domains_supported;
-
-		assert(opts->size <= sizeof(*opts));
-		if (copy_opts || use_pull_push) {
-			_bdev_io_copy_ext_opts(bdev_io, opts);
-			if (use_pull_push) {
-				_bdev_io_ext_use_bounce_buffer(bdev_io);
-				return 0;
-			}
-		}
-	}
-
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_WRITE_ZEROES)) {
-		bdev_io_submit(bdev_io);
+		_bdev_io_submit_ext(desc, bdev_io, opts, copy_opts);
 		return 0;
 	}
 
@@ -5098,6 +5063,16 @@ spdk_bdev_write_zeroes_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 				  spdk_bdev_io_completion_cb cb, void *cb_arg,
 				  struct spdk_bdev_ext_io_opts *opts)
 {
+	/** users should not provide a metadata buffer */
+	if (opts) {
+		if (spdk_unlikely(!_bdev_io_check_opts(opts, iov))) {
+			return -EINVAL;
+		}
+		if (opts->metadata) {
+			return -EINVAL;
+		}
+	}
+
 	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, opts, false);
 }
 
@@ -6888,6 +6863,15 @@ bdev_write_zero_buffer_next(void *_bdev_io)
 		md_buf = (char *)g_bdev_mgr.zero_buffer +
 			 spdk_bdev_get_block_size(bdev_io->bdev) * num_blocks;
 	}
+
+	bdev_io->iov.iov_base = g_bdev_mgr.zero_buffer;
+	bdev_io->iov.iov_len = num_bytes;
+
+	rc = bdev_writev_blocks_with_md(bdev_io->internal.desc,
+				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
+				       &bdev_io->iov, 1, md_buf,
+				       bdev_io->u.bdev.split_current_offset_blocks, num_blocks,
+				       bdev_write_zero_buffer_done, bdev_io)
 
 	rc = bdev_write_blocks_with_md(bdev_io->internal.desc,
 				       spdk_io_channel_from_ctx(bdev_io->internal.ch),
