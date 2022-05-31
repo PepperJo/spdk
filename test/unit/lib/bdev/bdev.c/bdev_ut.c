@@ -5535,13 +5535,13 @@ bdev_io_ext_split(void)
 	/* write zeroes - does not allow metadata */
 	ext_io_opts.metadata = NULL;
 	g_io_done = false;
-	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 14, 2, 1);
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 14, 2, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	expected_io->copy_opts = true;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
-	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 16, 6, 1);
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 16, 6, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	expected_io->copy_opts = true;
