@@ -5538,13 +5538,17 @@ bdev_io_ext_split(void)
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 14, 2, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
-	expected_io->copy_opts = true;
+	/*
+	 * ext_opts does not require copy on split since we do not allow metadata
+	 * or memory domain for write zeroes
+	 */
+	expected_io->copy_opts = false;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 16, 6, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
-	expected_io->copy_opts = true;
+	expected_io->copy_opts = false;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
 	rc = spdk_bdev_write_zeroes_blocks_ext(desc, io_ch, 14, 8, io_done, NULL, &ext_io_opts);

@@ -2452,7 +2452,7 @@ bdev_io_split_submit(struct spdk_bdev_io *bdev_io, struct iovec *iov, int iovcnt
 					      spdk_io_channel_from_ctx(bdev_io->internal.ch),
 					      current_offset, num_blocks,
 					      bdev_io_split_done, bdev_io,
-					      bdev_io->internal.ext_opts, true);
+					      bdev_io->internal.ext_opts);
 		break;
 	default:
 		assert(false);
@@ -4991,7 +4991,7 @@ static int
 bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 			 uint64_t offset_blocks, uint64_t num_blocks,
 			 spdk_bdev_io_completion_cb cb, void *cb_arg,
-			 struct spdk_bdev_ext_io_opts *opts, bool copy_opts)
+			 struct spdk_bdev_ext_io_opts *opts)
 {
 	struct spdk_bdev *bdev = spdk_bdev_desc_get_bdev(desc);
 	struct spdk_bdev_io *bdev_io;
@@ -5021,7 +5021,7 @@ bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 			 offset_blocks, num_blocks, cb, cb_arg, opts);
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_WRITE_ZEROES)) {
-		_bdev_io_submit_ext(desc, bdev_io, opts, copy_opts);
+		_bdev_io_submit_ext(desc, bdev_io, opts, false);
 		return 0;
 	}
 
@@ -5047,7 +5047,7 @@ spdk_bdev_write_zeroes(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		return -EINVAL;
 	}
 
-	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, NULL, false);
+	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, NULL);
 }
 
 int
@@ -5055,7 +5055,7 @@ spdk_bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channe
 			      uint64_t offset_blocks, uint64_t num_blocks,
 			      spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, NULL, false);
+	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, NULL);
 }
 
 int
@@ -5074,7 +5074,7 @@ spdk_bdev_write_zeroes_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_ch
 		}
 	}
 
-	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, opts, false);
+	return bdev_write_zeroes_blocks(desc, ch, offset_blocks, num_blocks, cb, cb_arg, opts);
 }
 
 int
