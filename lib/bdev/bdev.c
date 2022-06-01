@@ -375,7 +375,7 @@ static int
 bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
                          uint64_t offset_blocks, uint64_t num_blocks,
                          spdk_bdev_io_completion_cb cb, void *cb_arg,
-                         struct spdk_bdev_ext_io_opts *opts, bool copy_opts);
+                         struct spdk_bdev_ext_io_opts *opts);
 
 static int
 bdev_lock_lba_range(struct spdk_bdev_desc *desc, struct spdk_io_channel *_ch,
