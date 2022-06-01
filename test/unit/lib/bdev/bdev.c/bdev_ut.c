@@ -5533,9 +5533,10 @@ bdev_io_ext_split(void)
 	CU_ASSERT(g_bdev_ut_channel->outstanding_io_count == 0);
 
 	/* write zeroes - does not allow metadata */
+	bdev->max_write_zeroes = 6;
 	ext_io_opts.metadata = NULL;
 	g_io_done = false;
-	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 14, 2, 0);
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 14, 6, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	/*
@@ -5545,7 +5546,7 @@ bdev_io_ext_split(void)
 	expected_io->copy_opts = false;
 	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
 
-	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 16, 6, 0);
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE_ZEROES, 20, 2, 0);
 	expected_io->io_flags = SPDK_BDEV_IO_FLAG_FUA;
 	expected_io->ext_io_opts = &ext_io_opts;
 	expected_io->copy_opts = false;
