@@ -4623,6 +4623,7 @@ bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel
 	bdev_io->u.bdev.num_blocks = num_blocks;
 	bdev_io->u.bdev.offset_blocks = offset_blocks;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE)) {
 		bdev_io_submit(bdev_io);
@@ -4691,6 +4692,7 @@ bdev_compare_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 	bdev_io->u.bdev.num_blocks = num_blocks;
 	bdev_io->u.bdev.offset_blocks = offset_blocks;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE)) {
 		bdev_io_submit(bdev_io);
@@ -4876,6 +4878,7 @@ spdk_bdev_comparev_and_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io
 	bdev_io->u.bdev.num_blocks = num_blocks;
 	bdev_io->u.bdev.offset_blocks = offset_blocks;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_COMPARE_AND_WRITE)) {
 		bdev_io_submit(bdev_io);
@@ -4926,6 +4929,7 @@ spdk_bdev_zcopy_start(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	bdev_io->u.bdev.zcopy.commit = 0;
 	bdev_io->u.bdev.zcopy.start = 1;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	bdev_io_submit(bdev_io);
 
@@ -5000,6 +5004,7 @@ spdk_bdev_write_zeroes_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channe
 	bdev_io->u.bdev.offset_blocks = offset_blocks;
 	bdev_io->u.bdev.num_blocks = num_blocks;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	if (bdev_io_type_supported(bdev, SPDK_BDEV_IO_TYPE_WRITE_ZEROES)) {
 		bdev_io_submit(bdev_io);
@@ -5069,6 +5074,7 @@ spdk_bdev_unmap_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 	bdev_io->u.bdev.offset_blocks = offset_blocks;
 	bdev_io->u.bdev.num_blocks = num_blocks;
 	bdev_io_init(bdev_io, bdev, cb_arg, cb);
+	bdev_io->u.bdev.ext_opts = NULL;
 
 	bdev_io_submit(bdev_io);
 	return 0;
