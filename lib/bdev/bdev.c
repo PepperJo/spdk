@@ -4154,6 +4154,30 @@ bdev_io_valid_blocks(struct spdk_bdev *bdev, uint64_t offset_blocks, uint64_t nu
 	return true;
 }
 
+static inline bool
+_bdev_iov_valid_md(struct spdk_bdev_desc *desc, void *md_buf, struct iovec *iov)
+{
+	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return false;
+	}
+
+	if (md_buf && !_is_buf_allocated(iov)) {
+		return false;
+	}
+
+	return true;
+}
+
+static inline bool
+_bdev_io_valid_md(struct spdk_bdev_desc *desc, void *md_buf, void *buf)
+{
+	struct iovec iov = {
+		.iov_base = buf,
+	};
+
+	return _bdev_iov_valid_md(desc, md_buf, &iov);
+}
+
 static int
 bdev_read_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch, void *buf,
 			 void *md_buf, uint64_t offset_blocks, uint64_t num_blocks,
@@ -4217,15 +4241,7 @@ spdk_bdev_read_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_channe
 			      void *buf, void *md_buf, uint64_t offset_blocks, uint64_t num_blocks,
 			      spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	struct iovec iov = {
-		.iov_base = buf,
-	};
-
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(&iov)) {
+	if (!_bdev_io_valid_md(desc, md_buf, buf)) {
 		return -EINVAL;
 	}
 
@@ -4301,11 +4317,7 @@ spdk_bdev_readv_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chann
 			       uint64_t offset_blocks, uint64_t num_blocks,
 			       spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(iov)) {
+	if (!_bdev_iov_valid_md(desc, md_buf, iov)) {
 		return -EINVAL;
 	}
 
@@ -4344,11 +4356,7 @@ spdk_bdev_readv_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel *
 		md = opts->metadata;
 	}
 
-	if (md && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md && !_is_buf_allocated(iov)) {
+	if (!_bdev_iov_valid_md(desc, md, iov)) {
 		return -EINVAL;
 	}
 
@@ -4424,15 +4432,7 @@ spdk_bdev_write_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chann
 			       void *buf, void *md_buf, uint64_t offset_blocks, uint64_t num_blocks,
 			       spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	struct iovec iov = {
-		.iov_base = buf,
-	};
-
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(&iov)) {
+	if (!_bdev_io_valid_md(desc, md_buf, buf)) {
 		return -EINVAL;
 	}
 
@@ -4513,11 +4513,7 @@ spdk_bdev_writev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_chan
 				uint64_t offset_blocks, uint64_t num_blocks,
 				spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(iov)) {
+	if (!_bdev_iov_valid_md(desc, md_buf, iov)) {
 		return -EINVAL;
 	}
 
@@ -4541,11 +4537,7 @@ spdk_bdev_writev_blocks_ext(struct spdk_bdev_desc *desc, struct spdk_io_channel 
 		md = opts->metadata;
 	}
 
-	if (md && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md && !_is_buf_allocated(iov)) {
+	if (!_bdev_iov_valid_md(desc, md, iov)) {
 		return -EINVAL;
 	}
 
@@ -4670,11 +4662,7 @@ spdk_bdev_comparev_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_ch
 				  uint64_t offset_blocks, uint64_t num_blocks,
 				  spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(iov)) {
+	if (!_bdev_iov_valid_md(desc, md_buf, iov)) {
 		return -EINVAL;
 	}
 
@@ -4737,15 +4725,7 @@ spdk_bdev_compare_blocks_with_md(struct spdk_bdev_desc *desc, struct spdk_io_cha
 				 void *buf, void *md_buf, uint64_t offset_blocks, uint64_t num_blocks,
 				 spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
-	struct iovec iov = {
-		.iov_base = buf,
-	};
-
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
-		return -EINVAL;
-	}
-
-	if (md_buf && !_is_buf_allocated(&iov)) {
+	if (!_bdev_iov_valid_md(desc, md_buf, buf)) {
 		return -EINVAL;
 	}
 
