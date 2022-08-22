@@ -1747,6 +1747,7 @@ bdev_io_boundary_split_test(void)
 	CU_ASSERT(TAILQ_EMPTY(&g_bdev_ut_channel->expected_io));
 
 	/* Children requests return an error status */
+	bdev->md_len = 0;
 	bdev->optimal_io_boundary = 16;
 	iov[0].iov_base = (void *)0x10000;
 	iov[0].iov_len = 512 * 64;
@@ -5305,8 +5306,10 @@ _bdev_io_ext(struct spdk_bdev_ext_io_opts *ext_io_opts)
 	spdk_bdev_initialize(bdev_init_cb, NULL);
 
 	bdev = allocate_bdev("bdev0");
-	bdev->md_interleave = false;
-	bdev->md_len = 8;
+	if (ext_io_opts) {
+		bdev->md_interleave = false;
+		bdev->md_len = 8;
+	}
 
 	rc = spdk_bdev_open_ext("bdev0", true, bdev_ut_event_cb, NULL, &desc);
 	CU_ASSERT(rc == 0);

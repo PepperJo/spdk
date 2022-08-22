@@ -4157,11 +4157,18 @@ bdev_io_valid_blocks(struct spdk_bdev *bdev, uint64_t offset_blocks, uint64_t nu
 static inline bool
 _bdev_iov_valid_md(struct spdk_bdev_desc *desc, void *md_buf, struct iovec *iov)
 {
-	if (md_buf && !spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+	bool md_separate = spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc));
+
+	/* if no md or md interleaved we do not allow a md_buf */
+	if (md_buf && !md_separate) {
 		return false;
 	}
 
-	if (md_buf && !_is_buf_allocated(iov)) {
+	/*
+	 * if md is separate we allow md_buf to be NULL if iov is not allocated
+	 * However, if md_buf != NULL we require iov to be allocated
+	 */
+	if ((md_buf != NULL) != _is_buf_allocated(iov) && md_separate) {
 		return false;
 	}
 
@@ -4233,6 +4240,11 @@ spdk_bdev_read_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		      void *buf, uint64_t offset_blocks, uint64_t num_blocks,
 		      spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* if buf == NULL we allocate a buffer on read for both data and md */
+	if (buf && spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_read_blocks_with_md(desc, ch, buf, NULL, offset_blocks, num_blocks, cb, cb_arg);
 }
 
@@ -4307,6 +4319,11 @@ spdk_bdev_readv_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		       uint64_t offset_blocks, uint64_t num_blocks,
 		       spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* if iov buf == NULL we allocate a buffer on read for both data and md */
+	if (_is_buf_allocated(iov) && spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_readv_blocks_with_md(desc, ch, iov, iovcnt, NULL, offset_blocks,
 					 num_blocks, cb, cb_arg, NULL, false);
 }
@@ -4423,6 +4440,11 @@ spdk_bdev_write_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 		       void *buf, uint64_t offset_blocks, uint64_t num_blocks,
 		       spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* We do not allow no md_buf if there is md and md is separate */
+	if (spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_write_blocks_with_md(desc, ch, buf, NULL, offset_blocks, num_blocks,
 					 cb, cb_arg);
 }
@@ -4503,6 +4525,11 @@ spdk_bdev_writev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch,
 			uint64_t offset_blocks, uint64_t num_blocks,
 			spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* We do not allow no md_buf if there is md and md is separate */
+	if (spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_writev_blocks_with_md(desc, ch, iov, iovcnt, NULL, offset_blocks,
 					  num_blocks, cb, cb_arg, NULL, false);
 }
@@ -4652,6 +4679,11 @@ spdk_bdev_comparev_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *c
 			  uint64_t offset_blocks, uint64_t num_blocks,
 			  spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* We do not allow no md_buf if there is md and md is separate */
+	if (spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_comparev_blocks_with_md(desc, ch, iov, iovcnt, NULL, offset_blocks,
 					    num_blocks, cb, cb_arg);
 }
@@ -4716,6 +4748,11 @@ spdk_bdev_compare_blocks(struct spdk_bdev_desc *desc, struct spdk_io_channel *ch
 			 void *buf, uint64_t offset_blocks, uint64_t num_blocks,
 			 spdk_bdev_io_completion_cb cb, void *cb_arg)
 {
+	/* We do not allow no md_buf if there is md and md is separate */
+	if (spdk_bdev_is_md_separate(spdk_bdev_desc_get_bdev(desc))) {
+		return -EINVAL;
+	}
+
 	return bdev_compare_blocks_with_md(desc, ch, buf, NULL, offset_blocks, num_blocks,
 					   cb, cb_arg);
 }
