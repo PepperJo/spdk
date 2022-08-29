@@ -5768,6 +5768,1105 @@ for_each_bdev_test(void)
 	free_bdev(bdev[7]);
 }
 
+static void
+_bdev_md_rw(bool md_interleave)
+{
+	struct spdk_bdev *bdev;
+	struct spdk_bdev_desc *desc = NULL;
+	struct spdk_io_channel *io_ch;
+	struct ut_expected_io *expected_io;
+	uint32_t num_completed;
+	uint32_t block_size;
+	char io_buf[512 + 8];
+	char md_buf[8];
+	struct iovec iov = { .iov_base = io_buf, .iov_len = 512 };
+	struct spdk_bdev_ext_io_opts ext_io_opts = {
+		.size = sizeof(ext_io_opts)
+	};
+	int rc;
+
+	spdk_bdev_initialize(bdev_init_cb, NULL);
+
+	bdev = allocate_bdev("bdev0");
+
+	rc = spdk_bdev_open_ext("bdev0", true, bdev_ut_event_cb, NULL, &desc);
+	CU_ASSERT(rc == 0);
+	SPDK_CU_ASSERT_FATAL(desc != NULL);
+	CU_ASSERT(bdev == spdk_bdev_desc_get_bdev(desc));
+	io_ch = spdk_bdev_get_io_channel(desc);
+	CU_ASSERT(io_ch != NULL);
+
+	if (md_interleave) {
+		bdev->md_interleave = true;
+		bdev->md_len = 8;
+		iov.iov_len = 512 + 8;
+	}
+
+	block_size = spdk_bdev_get_block_size(bdev);
+
+	/* read => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read(desc, io_ch, io_buf, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read & buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read(desc, io_ch, NULL, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks(desc, io_ch, io_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks & buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks(desc, io_ch, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks_with_md & buf != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, io_buf, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks_with_md & buf != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, io_buf, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read_blocks_with_md & buf == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, NULL, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read_blocks_with_md & buf == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, NULL, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv(desc, io_ch, &iov, 1, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv(desc, io_ch, NULL, 0, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks(desc, io_ch, &iov, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks(desc, io_ch, NULL, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_with_md & iov != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, &iov, 1, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_with_md & iov != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, &iov, 1, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_with_md & iov == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, NULL, 0, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_with_md & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, NULL, 0, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & ext_io_opts == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_ext & iov == NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_ext & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write(desc, io_ch, io_buf, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write & io_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write(desc, io_ch, NULL, block_size, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks(desc, io_ch, io_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks & io_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks(desc, io_ch, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, io_buf, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, io_buf, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, NULL, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, NULL, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev(desc, io_ch, &iov, 1, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev(desc, io_ch, NULL, 0, block_size, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks(desc, io_ch, &iov, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks(desc, io_ch, NULL, 0, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_with_md & iov != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, &iov, 1, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_with_md & iov != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, &iov, 1, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_with_md & iov == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, NULL, 0, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_with_md & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, NULL, 0, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_ext & iov != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_ext & iov != NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_ext & iov == NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_ext & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, NULL, 0, 1, 0, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	spdk_put_io_channel(io_ch);
+	spdk_bdev_close(desc);
+	free_bdev(bdev);
+	spdk_bdev_finish(bdev_fini_cb, NULL);
+	poll_threads();
+}
+
+static void
+_bdev_md_compare(bool md_interleave, bool compare_emulated)
+{
+	struct spdk_bdev *bdev;
+	struct spdk_bdev_desc *desc = NULL;
+	struct spdk_io_channel *io_ch;
+	struct ut_expected_io *expected_io;
+	enum spdk_bdev_io_type expected_io_type;
+	uint32_t num_completed;
+	char io_buf[512 + 8];
+	char md_buf[8];
+	struct iovec iov = { .iov_base = io_buf, .iov_len = 512 };
+	struct spdk_bdev_ext_io_opts ext_io_opts = {
+		.size = sizeof(ext_io_opts)
+	};
+	int rc;
+
+	spdk_bdev_initialize(bdev_init_cb, NULL);
+
+	bdev = allocate_bdev("bdev0");
+
+	rc = spdk_bdev_open_ext("bdev0", true, bdev_ut_event_cb, NULL, &desc);
+	CU_ASSERT(rc == 0);
+	SPDK_CU_ASSERT_FATAL(desc != NULL);
+	CU_ASSERT(bdev == spdk_bdev_desc_get_bdev(desc));
+	io_ch = spdk_bdev_get_io_channel(desc);
+	CU_ASSERT(io_ch != NULL);
+
+	if (md_interleave) {
+		bdev->md_interleave = true;
+		bdev->md_len = 8;
+		iov.iov_len = 512 + 8;
+	}
+
+	if (compare_emulated) {
+		expected_io_type = SPDK_BDEV_IO_TYPE_READ;
+		fn_table.submit_request = stub_submit_request_get_buf;
+		g_io_types_supported[SPDK_BDEV_IO_TYPE_COMPARE] = false;
+	} else {
+		expected_io_type = SPDK_BDEV_IO_TYPE_COMPARE;
+	}
+
+	/* spdk_bdev_compare_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = io_buf;
+	g_compare_read_buf_len = iov.iov_len;
+	rc = spdk_bdev_compare_blocks(desc, io_ch, io_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_compare_blocks & io_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = NULL;
+	g_compare_read_buf_len = 0;
+	rc = spdk_bdev_compare_blocks(desc, io_ch, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_compare_blocks_with_md & io_buf != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = io_buf;
+	g_compare_read_buf_len = iov.iov_len;
+	rc = spdk_bdev_compare_blocks_with_md(desc, io_ch, io_buf, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_compare_blocks_with_md & io_buf != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_compare_blocks_with_md(desc, io_ch, io_buf, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_compare_blocks_with_md & io_buf == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_compare_blocks_with_md(desc, io_ch, NULL, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_compare_blocks_with_md & io_buf == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = NULL;
+	g_compare_read_buf_len = 0;
+	rc = spdk_bdev_compare_blocks_with_md(desc, io_ch, NULL, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_comparev_blocks => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = io_buf;
+	g_compare_read_buf_len = iov.iov_len;
+	rc = spdk_bdev_comparev_blocks(desc, io_ch, &iov, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_comparev_blocks & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = NULL;
+	g_compare_read_buf_len = 0;
+	rc = spdk_bdev_comparev_blocks(desc, io_ch, NULL, 0, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_comparev_blocks_with_md & iov != NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = io_buf;
+	g_compare_read_buf_len = iov.iov_len;
+	rc = spdk_bdev_comparev_blocks_with_md(desc, io_ch, &iov, 1, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_comparev_blocks_with_md & iov != NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_comparev_blocks_with_md(desc, io_ch, &iov, 1, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_comparev_blocks_with_md & iov == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_comparev_blocks_with_md(desc, io_ch, NULL, 0, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_comparev_blocks_with_md & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(expected_io_type, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	g_compare_read_buf = NULL;
+	g_compare_read_buf_len = 0;
+	rc = spdk_bdev_comparev_blocks_with_md(desc, io_ch, NULL, 0, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_comparev_and_writev_blocks */
+
+	g_compare_read_buf = NULL;
+	g_compare_read_buf_len = 0;
+
+	spdk_put_io_channel(io_ch);
+	spdk_bdev_close(desc);
+	free_bdev(bdev);
+	spdk_bdev_finish(bdev_fini_cb, NULL);
+	poll_threads();
+
+	g_io_types_supported[SPDK_BDEV_IO_TYPE_COMPARE] = true;
+
+	g_compare_read_buf = NULL;
+}
+
+static void
+bdev_no_md(void)
+{
+	_bdev_md_rw(false);
+	_bdev_md_compare(false, false);
+	_bdev_md_compare(false, true);
+}
+
+static void
+bdev_md_interleave(void)
+{
+	_bdev_md_rw(true);
+	_bdev_md_compare(true, false);
+	_bdev_md_compare(true, true);
+}
+
+static void
+_bdev_md_separate_rw(void)
+{
+	struct spdk_bdev *bdev;
+	struct spdk_bdev_desc *desc = NULL;
+	struct spdk_io_channel *io_ch;
+	struct ut_expected_io *expected_io;
+	uint32_t num_completed;
+	uint32_t block_size;
+	char io_buf[512];
+	char md_buf[8];
+	struct iovec iov = { .iov_base = io_buf, .iov_len = 512 };
+	struct spdk_bdev_ext_io_opts ext_io_opts = {
+		.size = sizeof(ext_io_opts)
+	};
+	int rc;
+
+	spdk_bdev_initialize(bdev_init_cb, NULL);
+
+	bdev = allocate_bdev("bdev0");
+
+	rc = spdk_bdev_open_ext("bdev0", true, bdev_ut_event_cb, NULL, &desc);
+	CU_ASSERT(rc == 0);
+	SPDK_CU_ASSERT_FATAL(desc != NULL);
+	CU_ASSERT(bdev == spdk_bdev_desc_get_bdev(desc));
+	io_ch = spdk_bdev_get_io_channel(desc);
+	CU_ASSERT(io_ch != NULL);
+
+	bdev->md_interleave = false;
+	bdev->md_len = 8;
+	block_size = spdk_bdev_get_block_size(bdev);
+
+	/* read => fail */
+	rc = spdk_bdev_read(desc, io_ch, io_buf, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read & buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read(desc, io_ch, NULL, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks => fail */
+	rc = spdk_bdev_read_blocks(desc, io_ch, io_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read_blocks & buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks(desc, io_ch, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks_with_md & buf != NULL & md_buf == NULL => fail */
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, io_buf, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read_blocks_with_md & buf != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = md_buf;
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, io_buf, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* read_blocks_with_md & buf == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, NULL, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* read_blocks_with_md & buf == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_read_blocks_with_md(desc, io_ch, NULL, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv => fail */
+	rc = spdk_bdev_readv(desc, io_ch, &iov, 1, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv(desc, io_ch, NULL, 0, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks => fail*/
+	rc = spdk_bdev_readv_blocks(desc, io_ch, &iov, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks(desc, io_ch, NULL, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_with_md & iov != NULL & md_buf == NULL => fail */
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, &iov, 1, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_with_md & iov != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = md_buf;
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, &iov, 1, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_with_md & iov == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, NULL, 0, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_with_md & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_readv_blocks_with_md(desc, io_ch, NULL, 0, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & ext_io_opts == NULL => fail */
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & md_buf == NULL => fail */
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_ext & iov != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = md_buf;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_readv_blocks_ext & iov == NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_readv_blocks_ext & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_READ, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_readv_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write => fail */
+	rc = spdk_bdev_write(desc, io_ch, io_buf, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write & io_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write(desc, io_ch, NULL, block_size, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks => fail */
+	rc = spdk_bdev_write_blocks(desc, io_ch, io_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write_blocks & io_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks(desc, io_ch, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf != NULL & md_buf == NULL => fail */
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, io_buf, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = md_buf;
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, io_buf, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, NULL, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_write_blocks_with_md & io_buf == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_write_blocks_with_md(desc, io_ch, NULL, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev => fail */
+	rc = spdk_bdev_writev(desc, io_ch, &iov, 1, block_size, block_size, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev(desc, io_ch, NULL, 0, block_size, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks */
+	rc = spdk_bdev_writev_blocks(desc, io_ch, &iov, 1, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks & iov == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks(desc, io_ch, NULL, 0, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_with_md & iov != NULL & md_buf == NULL => fail */
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, &iov, 1, NULL, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_with_md & iov != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, &iov, 1, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_with_md & iov == NULL & md_buf != NULL => fail */
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, NULL, 0, md_buf, 1, 1, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_with_md & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	rc = spdk_bdev_writev_blocks_with_md(desc, io_ch, NULL, 0, NULL, 1, 0, io_done, NULL);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_ext & iov != NULL & md_buf == NULL => fail */
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_ext & iov != NULL & md_buf != NULL => md != NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 1, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = md_buf;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, &iov, 1, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	/* spdk_bdev_writev_blocks_ext & iov == NULL & md_buf != NULL => fail */
+	ext_io_opts.metadata = md_buf;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, NULL, 0, 1, 1, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, -EINVAL);
+
+	/* spdk_bdev_writev_blocks_ext & iov == NULL & md_buf == NULL => md should be NULL and successful */
+	expected_io = ut_alloc_expected_io(SPDK_BDEV_IO_TYPE_WRITE, 1, 0, 0);
+	TAILQ_INSERT_TAIL(&g_bdev_ut_channel->expected_io, expected_io, link);
+
+	g_io_done = false;
+	expected_io->md_buf = NULL;
+	expected_io->ext_io_opts = &ext_io_opts;
+	ext_io_opts.metadata = NULL;
+	rc = spdk_bdev_writev_blocks_ext(desc, io_ch, NULL, 0, 1, 0, io_done, NULL, &ext_io_opts);
+	CU_ASSERT_EQUAL(rc, 0);
+	num_completed = stub_complete_io(1);
+	CU_ASSERT_EQUAL(num_completed, 1);
+	CU_ASSERT(g_io_done == true);
+	CU_ASSERT(g_io_status == SPDK_BDEV_IO_STATUS_SUCCESS);
+
+	spdk_put_io_channel(io_ch);
+	spdk_bdev_close(desc);
+	free_bdev(bdev);
+	spdk_bdev_finish(bdev_fini_cb, NULL);
+	poll_threads();
+}
+
+static void
+_bdev_md_separate_compare(bool compare_emulated)
+{
+
+}
+
+static void
+bdev_md_separate(void)
+{
+	_bdev_md_separate_rw();
+	_bdev_md_separate_compare(false);
+	_bdev_md_separate_compare(true);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -5826,6 +6925,9 @@ main(int argc, char **argv)
 	CU_ADD_TEST(suite, bdev_register_uuid_alias);
 	CU_ADD_TEST(suite, bdev_unregister_by_name);
 	CU_ADD_TEST(suite, for_each_bdev_test);
+	CU_ADD_TEST(suite, bdev_no_md);
+	CU_ADD_TEST(suite, bdev_md_interleave);
+	CU_ADD_TEST(suite, bdev_md_separate);
 
 	allocate_cores(1);
 	allocate_threads(1);
