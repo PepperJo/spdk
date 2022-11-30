@@ -345,6 +345,7 @@ struct rpc_subsystem_create {
 	bool ana_reporting;
 	uint16_t min_cntlid;
 	uint16_t max_cntlid;
+	bool discovery_only;
 };
 
 static const struct spdk_json_object_decoder rpc_subsystem_create_decoders[] = {
@@ -357,6 +358,7 @@ static const struct spdk_json_object_decoder rpc_subsystem_create_decoders[] = {
 	{"ana_reporting", offsetof(struct rpc_subsystem_create, ana_reporting), spdk_json_decode_bool, true},
 	{"min_cntlid", offsetof(struct rpc_subsystem_create, min_cntlid), spdk_json_decode_uint16, true},
 	{"max_cntlid", offsetof(struct rpc_subsystem_create, max_cntlid), spdk_json_decode_uint16, true},
+	{"discovery_only", offsetof(struct rpc_subsystem_create, discovery_only), spdk_json_decode_bool, true},
 };
 
 static void
@@ -409,9 +411,16 @@ rpc_nvmf_create_subsystem(struct spdk_jsonrpc_request *request,
 						     "Unable to find target %s", req->tgt_name);
 		goto cleanup;
 	}
-
-	subsystem = spdk_nvmf_subsystem_create(tgt, req->nqn, SPDK_NVMF_SUBTYPE_NVME,
-					       req->max_namespaces);
+	SPDK_ERRLOG("CREATE = %d", req->discovery_only);
+	if (req->discovery_only) {
+		subsystem = spdk_nvmf_subsystem_create_discovery_only(tgt, req->nqn,
+								     SPDK_NVMF_SUBTYPE_NVME,
+								     req->max_namespaces);
+	} else {
+		subsystem = spdk_nvmf_subsystem_create(tgt, req->nqn, SPDK_NVMF_SUBTYPE_NVME,
+						       req->max_namespaces);
+	}
+	
 	if (!subsystem) {
 		SPDK_ERRLOG("Unable to create subsystem %s\n", req->nqn);
 		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
@@ -749,6 +758,8 @@ nvmf_rpc_listen_paused(struct spdk_nvmf_subsystem *subsystem,
 
 	if (ctx->op == NVMF_RPC_LISTEN_ADD) {
 		if (!nvmf_subsystem_find_listener(subsystem, &ctx->trid)) {
+			SPDK_ERRLOG("LISTEN = %d", subsystem->flags.discovery_only);
+			ctx->opts.discovery_only = subsystem->flags.discovery_only;
 			rc = spdk_nvmf_tgt_listen_ext(ctx->tgt, &ctx->trid, &ctx->opts);
 			if (rc == 0) {
 				spdk_nvmf_subsystem_add_listener(ctx->subsystem, &ctx->trid, nvmf_rpc_subsystem_listen, ctx);

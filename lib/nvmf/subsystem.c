@@ -310,6 +310,19 @@ spdk_nvmf_subsystem_create(struct spdk_nvmf_tgt *tgt,
 	return subsystem;
 }
 
+struct spdk_nvmf_subsystem *
+spdk_nvmf_subsystem_create_discovery_only(struct spdk_nvmf_tgt *tgt,
+					  const char *nqn,
+					  enum spdk_nvmf_subtype type,
+					  uint32_t num_ns)
+{
+	struct spdk_nvmf_subsystem *subsystem = spdk_nvmf_subsystem_create(tgt, nqn, type, num_ns);
+	if (subsystem) {
+		subsystem->flags.discovery_only = true;
+	}
+	return subsystem;
+}
+
 /* Must hold subsystem->mutex while calling this function */
 static void
 nvmf_subsystem_remove_host(struct spdk_nvmf_subsystem *subsystem, struct spdk_nvmf_host *host)
@@ -1576,6 +1589,10 @@ spdk_nvmf_subsystem_add_ns_ext(struct spdk_nvmf_subsystem *subsystem, const char
 
 	if (!(subsystem->state == SPDK_NVMF_SUBSYSTEM_INACTIVE ||
 	      subsystem->state == SPDK_NVMF_SUBSYSTEM_PAUSED)) {
+		return 0;
+	}
+
+	if (subsystem->flags.discovery_only) {
 		return 0;
 	}
 

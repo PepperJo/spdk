@@ -254,7 +254,8 @@ struct spdk_nvmf_subsystem {
 		uint8_t					allow_any_host : 1;
 		uint8_t					allow_any_listener : 1;
 		uint8_t					ana_reporting : 1;
-		uint8_t					reserved : 5;
+		uint8_t					discovery_only : 1;
+		uint8_t					reserved : 4;
 	} flags;
 
 	/* boolean for state change synchronization */

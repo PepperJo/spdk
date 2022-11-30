@@ -306,7 +306,7 @@ spdk_nvmf_transport_listen(struct spdk_nvmf_transport *transport,
 			   const struct spdk_nvme_transport_id *trid, struct spdk_nvmf_listen_opts *opts)
 {
 	struct spdk_nvmf_listener *listener;
-	int rc;
+	int rc = 0;
 
 	listener = nvmf_transport_find_listener(transport, trid);
 	if (!listener) {
@@ -318,9 +318,12 @@ spdk_nvmf_transport_listen(struct spdk_nvmf_transport *transport,
 		listener->ref = 1;
 		listener->trid = *trid;
 		TAILQ_INSERT_TAIL(&transport->listeners, listener, link);
-		pthread_mutex_lock(&transport->mutex);
-		rc = transport->ops->listen(transport, &listener->trid, opts);
-		pthread_mutex_unlock(&transport->mutex);
+		SPDK_ERRLOG("DISCOVERY ONLY %d", opts->discovery_only);
+		if (!opts->discovery_only) {
+			pthread_mutex_lock(&transport->mutex);
+			rc = transport->ops->listen(transport, &listener->trid, opts);
+			pthread_mutex_unlock(&transport->mutex);
+		}
 		if (rc != 0) {
 			TAILQ_REMOVE(&transport->listeners, listener, link);
 			free(listener);

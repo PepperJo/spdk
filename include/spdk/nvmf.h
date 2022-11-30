@@ -107,8 +107,10 @@ struct spdk_nvmf_listen_opts {
 	size_t opts_size;
 
 	const struct spdk_json_val *transport_specific;
+
+	bool discovery_only;
 } __attribute__((packed));
-SPDK_STATIC_ASSERT(sizeof(struct spdk_nvmf_listen_opts) == 16, "Incorrect size");
+SPDK_STATIC_ASSERT(sizeof(struct spdk_nvmf_listen_opts) == 17, "Incorrect size %lu");
 
 /**
  * Initialize listen options
@@ -351,6 +353,11 @@ int spdk_nvmf_qpair_get_listen_trid(struct spdk_nvmf_qpair *qpair,
  * \return a pointer to a NVMe-oF subsystem on success, or NULL on failure.
  */
 struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_create(struct spdk_nvmf_tgt *tgt,
+		const char *nqn,
+		enum spdk_nvmf_subtype type,
+		uint32_t num_ns);
+
+struct spdk_nvmf_subsystem *spdk_nvmf_subsystem_create_discovery_only(struct spdk_nvmf_tgt *tgt,
 		const char *nqn,
 		enum spdk_nvmf_subtype type,
 		uint32_t num_ns);

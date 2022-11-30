@@ -182,7 +182,8 @@ def nvmf_create_subsystem(client,
                           max_namespaces=0,
                           ana_reporting=False,
                           min_cntlid=1,
-                          max_cntlid=0xffef):
+                          max_cntlid=0xffef,
+                          discovery_only=False):
     """Construct an NVMe over Fabrics target subsystem.
 
     Args:
@@ -227,6 +228,9 @@ def nvmf_create_subsystem(client,
 
     if max_cntlid is not None:
         params['max_cntlid'] = max_cntlid
+
+    if discovery_only:
+        params['discovery_only'] = True
 
     return client.call('nvmf_create_subsystem', params)
 
